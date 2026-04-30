@@ -141,12 +141,11 @@ class PortfolioItem {
   double get annualDividend => monthlyDividend * 12;
 }
 
-// 사용자 목표 설정
 class UserGoal {
-  final int monthlyTarget;        // 월 목표 배당금 (원)
-  final InvestmentProfile profile; // 투자 성향
-  final List<StockSector> preferredSectors; // 선호 섹터
-  final int investmentBudget;     // 추가 투자 가능 예산
+  final int monthlyTarget;
+  final InvestmentProfile profile;
+  final List<StockSector> preferredSectors;
+  final int investmentBudget;
 
   const UserGoal({
     required this.monthlyTarget,
@@ -154,4 +153,26 @@ class UserGoal {
     required this.preferredSectors,
     required this.investmentBudget,
   });
+
+  // 초기 상태를 위한 factory 메서드
+  factory UserGoal.initial() => const UserGoal(
+    monthlyTarget: 2000000,
+    profile: InvestmentProfile.balanced,
+    preferredSectors: [StockSector.all],
+    investmentBudget: 50000000,
+  );
+
+  UserGoal copyWith({
+    int? monthlyTarget,
+    InvestmentProfile? profile,
+    List<StockSector>? preferredSectors,
+    int? investmentBudget,
+  }) {
+    return UserGoal(
+      monthlyTarget: monthlyTarget ?? this.monthlyTarget,
+      profile: profile ?? this.profile,
+      preferredSectors: preferredSectors ?? this.preferredSectors,
+      investmentBudget: investmentBudget ?? this.investmentBudget,
+    );
+  }
 }

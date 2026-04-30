@@ -157,38 +157,49 @@ class KisClient {
 class KisPriceData {
   final String stockCode;
   final int currentPrice;
+  final int prevClosePrice;
+  final int changeAmount;
+  final double changePercent;
   final double per;
   final double pbr;
   final double eps;
+  final double bps;
   final int? marketCap;
-  final int high52w;
-  final int low52w;
+  final int high52w; // 52주 최고가 추가
+  final int low52w;  // 52주 최저가 추가
 
-  const KisPriceData({
+  KisPriceData({
     required this.stockCode,
     required this.currentPrice,
+    required this.prevClosePrice,
+    required this.changeAmount,
+    required this.changePercent,
     required this.per,
     required this.pbr,
     required this.eps,
+    required this.bps,
     this.marketCap,
     required this.high52w,
     required this.low52w,
   });
 
   factory KisPriceData.fromKis(String code, Map<String, dynamic> o) {
-    int pi(dynamic v) =>
-        int.tryParse(v?.toString().replaceAll(',', '') ?? '') ?? 0;
-    double pd(dynamic v) =>
-        double.tryParse(v?.toString().replaceAll(',', '') ?? '') ?? 0;
+    int pi(dynamic v) => int.tryParse(v?.toString().replaceAll(',', '') ?? '') ?? 0;
+    double pd(dynamic v) => double.tryParse(v?.toString().replaceAll(',', '') ?? '') ?? 0;
+
     return KisPriceData(
       stockCode: code,
       currentPrice: pi(o['stck_prpr']),
+      prevClosePrice: pi(o['stck_sdpr']),
+      changeAmount: pi(o['prdy_vrss']),
+      changePercent: pd(o['prdy_ctrt']),
       per: pd(o['per']),
       pbr: pd(o['pbr']),
       eps: pd(o['eps']),
+      bps: pd(o['bps']),
       marketCap: pi(o['hts_avls']),
-      high52w: pi(o['w52_hgpr']),
-      low52w: pi(o['w52_lwpr']),
+      high52w: pi(o['w52_hgpr']), // 추가된 부분 매핑
+      low52w: pi(o['w52_lwpr']),  // 추가된 부분 매핑
     );
   }
 }
@@ -198,6 +209,7 @@ class KisStockInfo {
   final String name;
   final String? sectorName;
   const KisStockInfo({required this.code, required this.name, this.sectorName});
+
   factory KisStockInfo.fromKis(Map<String, dynamic> o) => KisStockInfo(
     code: o['pdno']?.toString() ?? '',
     name: o['prdt_abrv_name']?.toString() ?? '',

@@ -108,3 +108,26 @@ FutureProvider.family<StockModel?, String>((ref, code) async {
   final service = ref.watch(stockServiceProvider);
   return service.fetchStock(code);
 });
+
+/// ─────────────────────────────────────────────────
+/// User Goal Notifier
+/// ─────────────────────────────────────────────────
+class UserGoalNotifier extends StateNotifier<UserGoal> {
+  UserGoalNotifier() : super(UserGoal.initial());
+
+  void updateMonthlyTarget(int target) {
+    state = state.copyWith(monthlyTarget: target);
+  }
+
+  void updateProfile(InvestmentProfile profile) {
+    state = state.copyWith(profile: profile);
+  }
+
+  void updateSectors(List<StockSector> sectors) {
+    state = state.copyWith(preferredSectors: sectors);
+  }
+}
+
+final userGoalProvider = StateNotifierProvider<UserGoalNotifier, UserGoal>((ref) {
+  return UserGoalNotifier();
+});

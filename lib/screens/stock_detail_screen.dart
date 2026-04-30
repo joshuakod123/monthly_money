@@ -7,6 +7,8 @@ import '../providers/app_providers.dart';
 import '../services/forecast_engine.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common_widgets.dart';
+import 'package:monthly_money/providers/app_providers.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class StockDetailScreen extends ConsumerWidget {
   final StockModel stock;

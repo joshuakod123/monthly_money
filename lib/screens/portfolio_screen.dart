@@ -5,6 +5,8 @@ import '../providers/app_providers.dart';
 import '../services/forecast_engine.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common_widgets.dart';
+import 'package:monthly_money/providers/app_providers.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart'; // Riverpod을 쓴다면 추가
 
 class PortfolioScreen extends ConsumerWidget {
   const PortfolioScreen({super.key});

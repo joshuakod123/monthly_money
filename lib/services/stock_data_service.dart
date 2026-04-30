@@ -32,7 +32,10 @@ import 'api/krx_client.dart';
 ///    - Hive 기반 디스크 캐싱 (오프라인/Rate-limit 대응)
 ///    - 한 종목당 한 번만 OpenDART 5회 호출 (5년치)
 ///    - 시세는 5분 캐시, 배당은 24시간 캐시
-/// ═══════════════════════════════════════════════════════════
+///
+///═══════════════════════════════════════════════════════════
+///
+
 class StockDataService {
   final OpenDartClient _dart = OpenDartClient();
   final KisClient _kis = KisClient();
@@ -431,20 +434,32 @@ class StockDataService {
   Future<void> _refreshPricesIfStale(List<StockModel> stocks) async {
     final now = DateTime.now();
     final stale = <StockModel>[];
+
     for (final s in stocks) {
       final cached = _priceCache.get('price_${s.code}');
       if (cached == null) {
         stale.add(s);
       } else if (cached is Map) {
         final cachedAt = DateTime.fromMillisecondsSinceEpoch(cached['_at'] as int);
+        // 캐시 유효 시간이 지났다면 갱신 대상(stale)에 추가합니다.
         if (now.difference(cachedAt) > ApiConfig.priceCacheDuration) {
           stale.add(s);
         }
       }
     }
+
+    // 갱신할 종목이 없다면 바로 종료합니다.
     if (stale.isEmpty) return;
-    final codes = stale.map((s) => s.code).toList();
-    await _kis.getMultiplePrices(codes); // 캐시에만 저장됨
+
+    // 💡 수정된 부분: 존재하지 않는 _kis.getMultiplePrices 대신,
+    // 이미 만들어둔 _fetchPriceWithCache를 활용하여 데이터를 가져오고 캐시까지 확실하게 저장합니다.
+    for (final s in stale) {
+      await _fetchPriceWithCache(s.code);
+
+      // KIS API의 초당 호출 제한(Rate Limit)에 걸리지 않도록
+      // 한 종목을 조회할 때마다 0.3초의 대기 시간을 줍니다.
+      await Future.delayed(const Duration(milliseconds: 300));
+    }
   }
 
   StockModel? _readStockCache(String code) {
