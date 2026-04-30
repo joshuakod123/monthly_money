@@ -1,93 +1,93 @@
-import 'dart:convert';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api_config.dart';
 
 /// ═══════════════════════════════════════════════════════════
-///  KIS (한국투자증권) Open API Client
-///
-///  - 실시간 시세 / 현재가 / PER / PBR / 시가총액 조회
-///  - OAuth2 access_token 자동 관리 (24시간 유효)
-///  - 무료, 모의투자 환경 지원
+///  KIS Client v3 — 견고성 강화
+///  - validateStatus 항상 true → Dio 가 throw 안하게
+///  - 모든 메서드 null 반환 (한 종목 실패가 전체 무너뜨리지 않음)
+///  - 토큰 캐시에 키 해시 같이 저장 (키 변경 시 자동 무효화)
 /// ═══════════════════════════════════════════════════════════
 class KisClient {
   final Dio _dio;
   String? _accessToken;
   DateTime? _tokenExpiresAt;
+  bool _warned500 = false;
 
   KisClient()
       : _dio = Dio(BaseOptions(
-          baseUrl: ApiConfig.currentKisUrl,
-          connectTimeout: const Duration(seconds: 10),
-          receiveTimeout: const Duration(seconds: 15),
-          headers: {'Content-Type': 'application/json; charset=UTF-8'},
-        ));
+    baseUrl: ApiConfig.kisBaseUrl,
+    connectTimeout: const Duration(seconds: 10),
+    receiveTimeout: const Duration(seconds: 15),
+    headers: {'Content-Type': 'application/json; charset=UTF-8'},
+    validateStatus: (_) => true,
+  ));
 
-  /// ─────────────────────────────────────────────────
-  /// 1️⃣ Access Token 발급 (OAuth2)
-  /// 토큰은 24시간 유효, SharedPreferences에 캐싱
-  /// ─────────────────────────────────────────────────
-  Future<String> _getAccessToken() async {
-    // 메모리 캐시 체크
+  Future<String?> _getAccessToken() async {
+    if (ApiConfig.kisAppKey.isEmpty || ApiConfig.kisAppSecret.isEmpty) {
+      debugPrint('⚠️ KIS 키 미입력 — api_config.dart 확인');
+      return null;
+    }
+
     if (_accessToken != null &&
         _tokenExpiresAt != null &&
         DateTime.now().isBefore(_tokenExpiresAt!)) {
-      return _accessToken!;
+      return _accessToken;
     }
 
-    // 디스크 캐시 체크
     final prefs = await SharedPreferences.getInstance();
-    final cachedToken = prefs.getString('kis_access_token');
-    final cachedExpiry = prefs.getInt('kis_token_expires_at');
-    if (cachedToken != null && cachedExpiry != null) {
-      final expiry = DateTime.fromMillisecondsSinceEpoch(cachedExpiry);
-      if (DateTime.now().isBefore(expiry)) {
-        _accessToken = cachedToken;
-        _tokenExpiresAt = expiry;
-        return _accessToken!;
+    final keyHash = ApiConfig.kisAppKey.hashCode.toString();
+    final cached = prefs.getString('kis_token');
+    final cachedExpiry = prefs.getInt('kis_token_exp');
+    final cachedHash = prefs.getString('kis_key_hash');
+
+    if (cached != null && cachedExpiry != null && cachedHash == keyHash) {
+      final exp = DateTime.fromMillisecondsSinceEpoch(cachedExpiry);
+      if (DateTime.now().isBefore(exp)) {
+        _accessToken = cached;
+        _tokenExpiresAt = exp;
+        return _accessToken;
       }
     }
 
-    // 새로 발급
     try {
-      final response = await _dio.post<Map<String, dynamic>>(
-        '/oauth2/tokenP',
-        data: {
-          'grant_type': 'client_credentials',
-          'appkey': ApiConfig.kisAppKey,
-          'appsecret': ApiConfig.kisAppSecret,
-        },
-      );
+      final res = await _dio.post('/oauth2/tokenP', data: {
+        'grant_type': 'client_credentials',
+        'appkey': ApiConfig.kisAppKey,
+        'appsecret': ApiConfig.kisAppSecret,
+      });
 
-      final data = response.data!;
-      _accessToken = data['access_token'] as String;
-      // KIS 토큰은 24시간 유효 → 안전하게 23시간으로 설정
+      if (res.statusCode != 200 || res.data == null) {
+        debugPrint('❌ KIS 토큰 발급 실패 ${res.statusCode}: ${res.data}');
+        return null;
+      }
+      final token = (res.data as Map)['access_token'] as String?;
+      if (token == null) return null;
+
+      _accessToken = token;
       _tokenExpiresAt = DateTime.now().add(const Duration(hours: 23));
-
-      // 디스크 캐싱
-      await prefs.setString('kis_access_token', _accessToken!);
-      await prefs.setInt(
-        'kis_token_expires_at',
-        _tokenExpiresAt!.millisecondsSinceEpoch,
-      );
-
-      return _accessToken!;
-    } on DioException catch (e) {
-      throw KisException('Access Token 발급 실패: ${e.message}');
+      await prefs.setString('kis_token', token);
+      await prefs.setInt('kis_token_exp',
+          _tokenExpiresAt!.millisecondsSinceEpoch);
+      await prefs.setString('kis_key_hash', keyHash);
+      debugPrint('✅ KIS 토큰 발급 성공');
+      return token;
+    } catch (e) {
+      debugPrint('❌ KIS 토큰 예외: $e');
+      return null;
     }
   }
 
-  /// ─────────────────────────────────────────────────
-  /// 2️⃣ 주식 현재가 시세 (FHKST01010100)
-  /// 가장 자주 호출되는 API. 현재가/등락률/거래량 등
-  /// ─────────────────────────────────────────────────
   Future<KisPriceData?> getCurrentPrice(String stockCode) async {
+    final token = await _getAccessToken();
+    if (token == null) return null;
+
     try {
-      final token = await _getAccessToken();
-      final response = await _dio.get<Map<String, dynamic>>(
+      final res = await _dio.get(
         '/uapi/domestic-stock/v1/quotations/inquire-price',
         queryParameters: {
-          'FID_COND_MRKT_DIV_CODE': 'J', // 주식 시장
+          'FID_COND_MRKT_DIV_CODE': 'J',
           'FID_INPUT_ISCD': stockCode,
         },
         options: Options(headers: {
@@ -99,29 +99,41 @@ class KisClient {
         }),
       );
 
-      final data = response.data!;
-      if (data['rt_cd'] != '0') return null;
+      if (res.statusCode == 500) {
+        if (!_warned500) {
+          debugPrint('⚠️ KIS 500 — 실전투자 키인지 확인 (모의투자 키는 시세 조회 ❌)');
+          _warned500 = true;
+        }
+        return null;
+      }
+      if (res.statusCode == 401 || res.statusCode == 403) {
+        _accessToken = null;
+        _tokenExpiresAt = null;
+        return null;
+      }
+      if (res.statusCode != 200 || res.data == null) return null;
 
-      final output = data['output'] as Map<String, dynamic>;
-      return KisPriceData.fromKis(stockCode, output);
-    } on DioException catch (e) {
-      throw KisException('현재가 조회 실패: ${e.message}');
+      final data = res.data as Map;
+      if (data['rt_cd'] != '0') {
+        debugPrint('현재가 ${stockCode} 실패: ${data['msg1']}');
+        return null;
+      }
+      final output = data['output'] as Map?;
+      if (output == null) return null;
+      return KisPriceData.fromKis(stockCode, Map<String, dynamic>.from(output));
+    } catch (e) {
+      debugPrint('현재가 ${stockCode} 예외: $e');
+      return null;
     }
   }
 
-  /// ─────────────────────────────────────────────────
-  /// 3️⃣ 주식 기본정보 (CTPF1604R)
-  /// 종목명, 시가총액, PER, PBR 등 종목 메타데이터
-  /// ─────────────────────────────────────────────────
   Future<KisStockInfo?> getStockInfo(String stockCode) async {
+    final token = await _getAccessToken();
+    if (token == null) return null;
     try {
-      final token = await _getAccessToken();
-      final response = await _dio.get<Map<String, dynamic>>(
+      final res = await _dio.get(
         '/uapi/domestic-stock/v1/quotations/search-stock-info',
-        queryParameters: {
-          'PRDT_TYPE_CD': '300', // 국내주식
-          'PDNO': stockCode,
-        },
+        queryParameters: {'PRDT_TYPE_CD': '300', 'PDNO': stockCode},
         options: Options(headers: {
           'authorization': 'Bearer $token',
           'appkey': ApiConfig.kisAppKey,
@@ -130,129 +142,65 @@ class KisClient {
           'custtype': 'P',
         }),
       );
-
-      final data = response.data!;
+      if (res.statusCode != 200 || res.data == null) return null;
+      final data = res.data as Map;
       if (data['rt_cd'] != '0') return null;
-
-      return KisStockInfo.fromKis(data['output'] as Map<String, dynamic>);
-    } on DioException {
+      final output = data['output'] as Map?;
+      if (output == null) return null;
+      return KisStockInfo.fromKis(Map<String, dynamic>.from(output));
+    } catch (e) {
       return null;
     }
   }
-
-  /// ─────────────────────────────────────────────────
-  /// 4️⃣ 여러 종목 일괄 조회 (병렬 처리)
-  /// 처리량 제한이 있어 청크 단위로 호출
-  /// ─────────────────────────────────────────────────
-  Future<Map<String, KisPriceData>> getMultiplePrices(
-      List<String> stockCodes) async {
-    final Map<String, KisPriceData> result = {};
-
-    // KIS 초당 20건 제한 → 안전하게 5개씩 묶어 100ms 간격
-    const chunkSize = 5;
-    for (var i = 0; i < stockCodes.length; i += chunkSize) {
-      final chunk = stockCodes.skip(i).take(chunkSize).toList();
-      final futures = chunk.map((code) => getCurrentPrice(code));
-      final prices = await Future.wait(futures, eagerError: false);
-
-      for (var j = 0; j < chunk.length; j++) {
-        if (prices[j] != null) result[chunk[j]] = prices[j]!;
-      }
-
-      // Rate limit 대응
-      if (i + chunkSize < stockCodes.length) {
-        await Future.delayed(const Duration(milliseconds: 250));
-      }
-    }
-    return result;
-  }
 }
 
-/// 현재가 데이터 (KIS inquire-price 응답)
 class KisPriceData {
   final String stockCode;
-  final int currentPrice;          // stck_prpr
-  final int prevClosePrice;        // stck_sdpr 전일종가
-  final int changeAmount;          // prdy_vrss
-  final double changePercent;      // prdy_ctrt
-  final double per;                // per
-  final double pbr;                // pbr
-  final double eps;                // eps
-  final double bps;                // bps
-  final int? marketCap;            // hts_avls (시가총액, 백만원)
-  final int high52w;               // w52_hgpr
-  final int low52w;                // w52_lwpr
+  final int currentPrice;
+  final double per;
+  final double pbr;
+  final double eps;
+  final int? marketCap;
+  final int high52w;
+  final int low52w;
 
   const KisPriceData({
     required this.stockCode,
     required this.currentPrice,
-    required this.prevClosePrice,
-    required this.changeAmount,
-    required this.changePercent,
     required this.per,
     required this.pbr,
     required this.eps,
-    required this.bps,
     this.marketCap,
     required this.high52w,
     required this.low52w,
   });
 
-  factory KisPriceData.fromKis(String stockCode, Map<String, dynamic> output) {
-    int parseInt(dynamic v) =>
+  factory KisPriceData.fromKis(String code, Map<String, dynamic> o) {
+    int pi(dynamic v) =>
         int.tryParse(v?.toString().replaceAll(',', '') ?? '') ?? 0;
-    double parseDouble(dynamic v) =>
+    double pd(dynamic v) =>
         double.tryParse(v?.toString().replaceAll(',', '') ?? '') ?? 0;
-
     return KisPriceData(
-      stockCode: stockCode,
-      currentPrice: parseInt(output['stck_prpr']),
-      prevClosePrice: parseInt(output['stck_sdpr']),
-      changeAmount: parseInt(output['prdy_vrss']),
-      changePercent: parseDouble(output['prdy_ctrt']),
-      per: parseDouble(output['per']),
-      pbr: parseDouble(output['pbr']),
-      eps: parseDouble(output['eps']),
-      bps: parseDouble(output['bps']),
-      marketCap: parseInt(output['hts_avls']),
-      high52w: parseInt(output['w52_hgpr']),
-      low52w: parseInt(output['w52_lwpr']),
+      stockCode: code,
+      currentPrice: pi(o['stck_prpr']),
+      per: pd(o['per']),
+      pbr: pd(o['pbr']),
+      eps: pd(o['eps']),
+      marketCap: pi(o['hts_avls']),
+      high52w: pi(o['w52_hgpr']),
+      low52w: pi(o['w52_lwpr']),
     );
   }
 }
 
-/// 종목 기본정보
 class KisStockInfo {
   final String code;
   final String name;
-  final String? sectorCode;
   final String? sectorName;
-  final int? listingShares;
-
-  const KisStockInfo({
-    required this.code,
-    required this.name,
-    this.sectorCode,
-    this.sectorName,
-    this.listingShares,
-  });
-
-  factory KisStockInfo.fromKis(Map<String, dynamic> output) {
-    return KisStockInfo(
-      code: output['pdno']?.toString() ?? '',
-      name: output['prdt_abrv_name']?.toString() ?? '',
-      sectorCode: output['std_idst_clsf_cd']?.toString(),
-      sectorName: output['std_idst_clsf_cd_name']?.toString(),
-      listingShares: int.tryParse(
-        (output['lstg_stqt']?.toString() ?? '').replaceAll(',', ''),
-      ),
-    );
-  }
-}
-
-class KisException implements Exception {
-  final String message;
-  KisException(this.message);
-  @override
-  String toString() => 'KisException: $message';
+  const KisStockInfo({required this.code, required this.name, this.sectorName});
+  factory KisStockInfo.fromKis(Map<String, dynamic> o) => KisStockInfo(
+    code: o['pdno']?.toString() ?? '',
+    name: o['prdt_abrv_name']?.toString() ?? '',
+    sectorName: o['std_idst_clsf_cd_name']?.toString(),
+  );
 }

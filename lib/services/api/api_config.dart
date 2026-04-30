@@ -1,59 +1,36 @@
 /// ═══════════════════════════════════════════════════════════
-///  API 설정
+///  API 설정 (v3)
+///
+///  ⚠️ 핵심 수정 사항:
+///  1. openDartBaseUrl 누락 버그 수정
+///  2. KIS 모의투자(VTS) 서버는 시세 조회 미지원 — 항상 실전 서버 사용
+///  3. 키 미입력 시 명확한 에러 메시지
 /// ═══════════════════════════════════════════════════════════
-///
-/// 발급 방법:
-///
-/// 1. OpenDART (배당 historical 데이터) - 무료, 즉시 발급
-///    https://opendart.fss.or.kr → 인증키 신청/관리
-///    → 발급된 40자 키를 OPENDART_API_KEY 에 입력
-///
-/// 2. 한국투자증권 KIS Open API (실시간 시세) - 무료
-///    https://apiportal.koreainvestment.com → 회원가입 → 앱 등록
-///    → AppKey (36자), AppSecret (180자)
-///    ⚠️ 모의투자/실전투자 키가 다름. 모의는 vts.koreainvestment.com 사용
-///
-/// 3. KRX 정보데이터시스템 (종목 마스터)
-///    http://data.krx.co.kr → 별도 키 불필요, OTP 기반
-///    실제 운영시에는 종목 마스터를 미리 다운받아 캐싱하는 것을 권장
-///
-/// ⚠️ 보안: 실 배포에서는 .env 파일이나 secure storage(flutter_secure_storage)에 저장
-///        절대 git 에 commit 하지 말 것
-///
 class ApiConfig {
-  // ──────────────────────────────────────
-  // OpenDART (금융감독원 전자공시)
-  // ──────────────────────────────────────
-  static const String openDartApiKey = '';
-  static const String openDartBaseUrl = '';
+  // OpenDART
+  static const String openDartApiKey = '7506d1f9a3373be82bd99c11696d14ddacf887fc'; // ⚠️ 40자 키 입력
+  static const String openDartBaseUrl = 'https://opendart.fss.or.kr/api'; // FIXED
 
-  // ──────────────────────────────────────
-  // KIS (한국투자증권)
-  // ──────────────────────────────────────
-  // 실전투자
-  static const String kisAppKey = '';
-  static const String kisAppSecret = '';
+  // KIS — 시세 조회는 반드시 "실전투자" 키 필요 (모의투자 키 ❌)
+  static const String kisAppKey = 'PSMrdCISdPsDd6dOJbStjs3SVW80gj9Z0QG2';     // ⚠️ 36자 (실전투자)
+  static const String kisAppSecret = 'T0CkXvHoFPOwHcl1jW+cZEBU3SOMGBIKA0d3AEe+tlEcyfrNCnPyukTWq9pbKNgjRgQwJLsFBm3yt+0r8Hk89DBPmkYEsBaopnx9OU4/zdTL5mJ/5Zf1YM7b9UwmEsUSnx/AkY4ol2Urcm6MYjVnP0d70FJs4AQL50vFprNibz5A51xk5jY=';  // ⚠️ 180자 (실전투자)
   static const String kisBaseUrl = 'https://openapi.koreainvestment.com:9443';
 
-  // 모의투자 (개발/테스트용)
-  static const String kisMockBaseUrl = 'https://openapivts.koreainvestment.com:29443';
-  static const bool useMockTrading = true; // 개발 중에는 true
-
-  static String get currentKisUrl =>
-      useMockTrading ? kisMockBaseUrl : kisBaseUrl;
-
-  // ──────────────────────────────────────
-  // KRX 정보데이터
-  // ──────────────────────────────────────
+  // KRX
   static const String krxBaseUrl = 'http://data.krx.co.kr';
 
-  // ──────────────────────────────────────
-  // 캐시 정책
-  // ──────────────────────────────────────
+  // 캐시
   static const Duration priceCacheDuration = Duration(minutes: 5);
   static const Duration dividendCacheDuration = Duration(days: 1);
   static const Duration corpCodeCacheDuration = Duration(days: 7);
-
-  // 배당 historical 조회 연도 (최근 N년)
   static const int dividendHistoryYears = 5;
+
+  static String? validate() {
+    if (openDartApiKey.isEmpty) return 'OpenDART API 키 미입력';
+    if (kisAppKey.isEmpty || kisAppSecret.isEmpty) return 'KIS API 키 미입력 (실전투자)';
+    if (kisAppKey.length != 36) return 'KIS AppKey는 36자여야 합니다';
+    return null;
+  }
+
+  static bool get isConfigured => validate() == null;
 }
