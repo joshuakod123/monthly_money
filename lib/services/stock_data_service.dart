@@ -235,6 +235,7 @@ class StockDataService {
       dividendPerShare: latest,
       latestDividend: latest,
       frequency: m.frequency,
+      paymentMonths: m.paymentMonths,
       per: m.fallbackPer,
       pbr: 0.6,
       roe: m.fallbackPer > 0 ? 100 / m.fallbackPer : 8,
