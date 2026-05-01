@@ -1,6 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
-import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:xml/xml.dart' as xml;
 import 'package:archive/archive.dart';
@@ -46,7 +44,10 @@ class OpenDartClient {
 
       // ZIP 압축 해제
       final archive = ZipDecoder().decodeBytes(response.data!);
-      final xmlFile = archive.firstWhere((f) => f.name == 'CORPCODE.xml');
+      final xmlFile = archive.firstWhere(
+            (f) => f.name.toUpperCase() == 'CORPCODE.XML',
+        orElse: () => throw OpenDartException('CORPCODE.xml 없음'),
+      );
       final xmlContent = utf8.decode(xmlFile.content as List<int>);
 
       // XML 파싱
