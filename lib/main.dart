@@ -1,17 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';   // 👈 추가
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'theme/app_theme.dart';
-import 'screens/main_scaffold.dart';
+import 'screens/onboarding_gate.dart';
 import 'services/stock_data_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 👇 .env 로드 (StockDataService.init() 보다 먼저!)
   await dotenv.load(fileName: ".env");
-
   await StockDataService.instance.init();
 
   SystemChrome.setSystemUIOverlayStyle(
@@ -32,7 +30,7 @@ class DividendApp extends StatelessWidget {
       title: '배당나무',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
-      home: const MainScaffold(),
+      home: const OnboardingGate(), // 👈 퀴즈 게이트가 첫 화면
     );
   }
 }

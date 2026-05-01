@@ -69,15 +69,16 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
     }
   }
 
-  void _finish() {
+  void _finish() async {
     final profile = QuizBank.buildProfile(
       answers: _answers,
       monthlyTarget: _monthlyTarget,
       budget: _budget,
       preferredSectors: _preferredSectors,
     );
-    ref.read(personaProfileProvider.notifier).state = profile;
-    Navigator.pop(context, profile);
+    // 새 메서드: setProfile (디스크 저장까지)
+    await ref.read(personaProfileProvider.notifier).setProfile(profile);
+    if (mounted) Navigator.pop(context);
   }
 
   @override

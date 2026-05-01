@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import '../widgets/calendar_screen.dart';
 import 'home_screen.dart';
-import 'portfolio_screen.dart';
+import 'profile_screen.dart';
 
 class MainScaffold extends StatefulWidget {
   const MainScaffold({super.key});
-
   @override
   State<MainScaffold> createState() => _MainScaffoldState();
 }
@@ -13,23 +13,20 @@ class MainScaffold extends StatefulWidget {
 class _MainScaffoldState extends State<MainScaffold> {
   int _index = 0;
 
-  final _screens = [
-    const HomeScreen(),
-    const PortfolioScreen(),
-    const _PlaceholderScreen(title: '탐색', icon: Icons.search_rounded),
-    const _PlaceholderScreen(title: '설정', icon: Icons.settings_rounded),
+  final _screens = const [
+    HomeScreen(),
+    CalendarScreen(),
+    _PlaceholderScreen(title: '탐색', icon: Icons.search_rounded),
+    ProfileScreen(),
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: _index,
-        children: _screens,
-      ),
+      body: IndexedStack(index: _index, children: _screens),
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
-          color: Colors.white,
+          color: AppColors.bgCard,
           border: Border(top: BorderSide(color: AppColors.border)),
         ),
         child: SafeArea(
@@ -44,8 +41,8 @@ class _MainScaffoldState extends State<MainScaffold> {
                   onTap: () => setState(() => _index = 0),
                 ),
                 _NavItem(
-                  icon: Icons.pie_chart_rounded,
-                  label: '포트폴리오',
+                  icon: Icons.calendar_month_rounded,
+                  label: '캘린더',
                   isActive: _index == 1,
                   onTap: () => setState(() => _index = 1),
                 ),
@@ -75,13 +72,11 @@ class _NavItem extends StatelessWidget {
   final String label;
   final bool isActive;
   final VoidCallback onTap;
-
-  const _NavItem({
-    required this.icon,
-    required this.label,
-    required this.isActive,
-    required this.onTap,
-  });
+  const _NavItem(
+      {required this.icon,
+        required this.label,
+        required this.isActive,
+        required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -94,20 +89,18 @@ class _NavItem extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                icon,
-                size: 22,
-                color: isActive ? AppColors.primary : AppColors.textHint,
-              ),
+              Icon(icon,
+                  size: 22,
+                  color: isActive ? AppColors.primary : AppColors.textHint),
               const SizedBox(height: 3),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 10,
-                  color: isActive ? AppColors.primary : AppColors.textHint,
-                  fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-                ),
-              ),
+              Text(label,
+                  style: TextStyle(
+                    fontSize: 10,
+                    color:
+                    isActive ? AppColors.primary : AppColors.textHint,
+                    fontWeight:
+                    isActive ? FontWeight.w700 : FontWeight.w500,
+                  )),
             ],
           ),
         ),
@@ -125,25 +118,16 @@ class _PlaceholderScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.bgPage,
-      appBar: AppBar(
-        title: Text(title),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-      ),
+      appBar: AppBar(title: Text(title)),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(icon, size: 80, color: AppColors.border),
             const SizedBox(height: 16),
-            Text('$title 화면',
-                style: const TextStyle(
-                  fontSize: 16, color: AppColors.textSecondary,
-                )),
-            const SizedBox(height: 4),
             const Text('준비중입니다',
                 style: TextStyle(
-                  fontSize: 12, color: AppColors.textHint,
+                  fontSize: 14, color: AppColors.textHint,
                 )),
           ],
         ),
