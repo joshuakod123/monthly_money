@@ -3,9 +3,15 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'theme/app_theme.dart';
 import 'screens/main_scaffold.dart';
+import 'services/stock_data_service.dart';
 
-void main() {
+void main() async {
+  // 비동기 초기화를 위해 ensureInitialized 호출
   WidgetsFlutterBinding.ensureInitialized();
+
+  // 로컬 캐시 DB(Hive) 및 서비스 초기화
+  await StockDataService.instance.init();
+
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
