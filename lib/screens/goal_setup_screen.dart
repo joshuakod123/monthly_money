@@ -5,7 +5,6 @@ import '../providers/app_providers.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common_widgets.dart';
 
-
 class GoalSetupScreen extends ConsumerStatefulWidget {
   const GoalSetupScreen({super.key});
 
@@ -125,10 +124,10 @@ class _GoalSetupScreenState extends ConsumerState<GoalSetupScreen> {
             ),
             const SizedBox(height: 12),
             ...InvestmentProfile.values.map((p) => _ProfileCard(
-                  profile: p,
-                  selected: _profile == p,
-                  onTap: () => setState(() => _profile = p),
-                )),
+              profile: p,
+              selected: _profile == p,
+              onTap: () => setState(() => _profile = p),
+            )),
 
             const SizedBox(height: 32),
 
@@ -278,14 +277,14 @@ class _ProfileCard extends StatelessWidget {
               ),
               child: selected
                   ? Center(
-                      child: Container(
-                        width: 10, height: 10,
-                        decoration: const BoxDecoration(
-                          color: AppColors.accent,
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    )
+                child: Container(
+                  width: 10, height: 10,
+                  decoration: const BoxDecoration(
+                    color: AppColors.accent,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              )
                   : null,
             ),
             const SizedBox(width: 14),

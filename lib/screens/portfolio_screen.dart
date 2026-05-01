@@ -5,8 +5,6 @@ import '../providers/app_providers.dart';
 import '../services/forecast_engine.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common_widgets.dart';
-import 'package:monthly_money/providers/app_providers.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart'; // Riverpod을 쓴다면 추가
 
 class PortfolioScreen extends ConsumerWidget {
   const PortfolioScreen({super.key});
@@ -16,7 +14,7 @@ class PortfolioScreen extends ConsumerWidget {
     final portfolio = ref.watch(portfolioProvider);
     final goal = ref.watch(userGoalProvider);
     final totalMonthly =
-        ref.read(portfolioProvider.notifier).totalMonthlyDividend.round();
+    ref.read(portfolioProvider.notifier).totalMonthlyDividend.round();
     final totalValue = ref.read(portfolioProvider.notifier).totalValue.round();
 
     // 보유 포트폴리오의 미래 예측
@@ -25,7 +23,7 @@ class PortfolioScreen extends ConsumerWidget {
     };
     final forecast = portfolio.isNotEmpty
         ? ForecastEngine.forecastPortfolio(
-            portfolio: myPortfolioMap, targetYears: 3)
+        portfolio: myPortfolioMap, targetYears: 3)
         : null;
 
     return Scaffold(
@@ -222,89 +220,89 @@ class PortfolioScreen extends ConsumerWidget {
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
             const SizedBox(height: 12),
             ...portfolio.map((item) => Container(
-                  padding: const EdgeInsets.all(14),
-                  margin: const EdgeInsets.only(bottom: 10),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: Column(
+              padding: const EdgeInsets.all(14),
+              margin: const EdgeInsets.only(bottom: 10),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Column(
+                children: [
+                  Row(
                     children: [
-                      Row(
-                        children: [
-                          Container(
-                            width: 40, height: 40,
-                            decoration: BoxDecoration(
-                              color: item.stock.sectorColor,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            alignment: Alignment.center,
-                            child: Text(item.stock.sector.emoji,
-                                style: const TextStyle(fontSize: 18)),
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(item.stock.name,
-                                    style: const TextStyle(
-                                      fontSize: 14, fontWeight: FontWeight.w700,
-                                    )),
-                                Text('${item.shares}주 · 평단 ${formatKRW(item.avgPrice)}',
-                                    style: const TextStyle(
-                                      fontSize: 11, color: AppColors.textSecondary,
-                                    )),
-                              ],
-                            ),
-                          ),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Text(formatKRW(item.totalValue),
-                                  style: const TextStyle(
-                                    fontSize: 14, fontWeight: FontWeight.w700,
-                                  )),
-                              Text(
-                                '${item.gainLoss >= 0 ? '+' : ''}${item.gainLossPct.toStringAsFixed(1)}%',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  color: item.gainLoss >= 0
-                                      ? AppColors.positive
-                                      : AppColors.negative,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
+                      Container(
+                        width: 40, height: 40,
+                        decoration: BoxDecoration(
+                          color: item.stock.sectorColor,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(item.stock.sector.emoji,
+                            style: const TextStyle(fontSize: 18)),
                       ),
-                      const Divider(height: 18),
-                      Row(
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(item.stock.name,
+                                style: const TextStyle(
+                                  fontSize: 14, fontWeight: FontWeight.w700,
+                                )),
+                            Text('${item.shares}주 · 평단 ${formatKRW(item.avgPrice)}',
+                                style: const TextStyle(
+                                  fontSize: 11, color: AppColors.textSecondary,
+                                )),
+                          ],
+                        ),
+                      ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.end,
                         children: [
-                          const Icon(Icons.payments_rounded,
-                              size: 14, color: AppColors.accent),
-                          const SizedBox(width: 4),
+                          Text(formatKRW(item.totalValue),
+                              style: const TextStyle(
+                                fontSize: 14, fontWeight: FontWeight.w700,
+                              )),
                           Text(
-                            '월 배당 ${formatKRW(item.monthlyDividend)}',
-                            style: const TextStyle(
-                              fontSize: 12, color: AppColors.accent,
+                            '${item.gainLoss >= 0 ? '+' : ''}${item.gainLossPct.toStringAsFixed(1)}%',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: item.gainLoss >= 0
+                                  ? AppColors.positive
+                                  : AppColors.negative,
                               fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          const Spacer(),
-                          Text(
-                            '연 ${formatKRW(item.annualDividend)}',
-                            style: const TextStyle(
-                              fontSize: 11, color: AppColors.textSecondary,
                             ),
                           ),
                         ],
                       ),
                     ],
                   ),
-                )),
+                  const Divider(height: 18),
+                  Row(
+                    children: [
+                      const Icon(Icons.payments_rounded,
+                          size: 14, color: AppColors.accent),
+                      const SizedBox(width: 4),
+                      Text(
+                        '월 배당 ${formatKRW(item.monthlyDividend)}',
+                        style: const TextStyle(
+                          fontSize: 12, color: AppColors.accent,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        '연 ${formatKRW(item.annualDividend)}',
+                        style: const TextStyle(
+                          fontSize: 11, color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            )),
           ],
         ),
       ),

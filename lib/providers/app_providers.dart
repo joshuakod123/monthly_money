@@ -1,133 +1,145 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../algorithms/persona_profile.dart';
-import '../algorithms/recommendation_engine.dart';
 import '../models/stock_model.dart';
 import '../services/stock_data_service.dart';
 import '../services/forecast_engine.dart';
 
-/// ═══════════════════════════════════════════════════════════
-///  Persona-driven Providers
-/// ═══════════════════════════════════════════════════════════
+// ─────────────────────────────────────────
+// 사용자 목표 설정 Provider
+// ─────────────────────────────────────────
+class UserGoalNotifier extends StateNotifier<UserGoal> {
+  UserGoalNotifier()
+      : super(const UserGoal(
+    monthlyTarget: 2000000,
+    profile: InvestmentProfile.stable,
+    preferredSectors: [StockSector.all],
+    investmentBudget: 50000000,
+  ));
 
-/// 사용자 페르소나 (스무고개 결과)
-/// null이면 아직 퀴즈 안 한 상태 → 퀴즈 권유
-final personaProfileProvider = StateProvider<PersonaProfile?>((ref) => null);
+  void updateMonthlyTarget(int amount) {
+    state = UserGoal(
+      monthlyTarget: amount,
+      profile: state.profile,
+      preferredSectors: state.preferredSectors,
+      investmentBudget: state.investmentBudget,
+    );
+  }
 
-/// StockDataService 싱글턴
-final stockServiceProvider = Provider<StockDataService>((ref) {
-  return StockDataService.instance;
+  void updateProfile(InvestmentProfile profile) {
+    state = UserGoal(
+      monthlyTarget: state.monthlyTarget,
+      profile: profile,
+      preferredSectors: state.preferredSectors,
+      investmentBudget: state.investmentBudget,
+    );
+  }
+
+  void updateSectors(List<StockSector> sectors) {
+    state = UserGoal(
+      monthlyTarget: state.monthlyTarget,
+      profile: state.profile,
+      preferredSectors: sectors,
+      investmentBudget: state.investmentBudget,
+    );
+  }
+
+  void updateBudget(int budget) {
+    state = UserGoal(
+      monthlyTarget: state.monthlyTarget,
+      profile: state.profile,
+      preferredSectors: state.preferredSectors,
+      investmentBudget: budget,
+    );
+  }
+}
+
+final userGoalProvider =
+StateNotifierProvider<UserGoalNotifier, UserGoal>((ref) {
+  return UserGoalNotifier();
 });
 
-/// 전체 종목 universe
-final allStocksProvider = FutureProvider<List<StockModel>>((ref) async {
-  final service = ref.watch(stockServiceProvider);
-  return service.getRecommendedStocks();
-});
-
-/// 페르소나 기반 추천 (퀴즈 안 했으면 빈 결과)
-final personalizedRecommendationProvider =
-FutureProvider<PortfolioRecommendation?>((ref) async {
-  final persona = ref.watch(personaProfileProvider);
-  if (persona == null) return null;
-  final universe = await ref.watch(allStocksProvider.future);
-  return RecommendationEngine.buildPortfolio(
-    persona: persona,
-    universe: universe,
+// ─────────────────────────────────────────
+// 추천 포트폴리오 Provider (목표 + 성향 기반)
+// ─────────────────────────────────────────
+final recommendedPortfolioProvider =
+Provider<Map<StockModel, int>>((ref) {
+  final goal = ref.watch(userGoalProvider);
+  return StockDataService.recommendPortfolio(
+    monthlyGoal: goal.monthlyTarget,
+    profile: goal.profile,
+    preferredSectors: goal.preferredSectors,
   );
 });
 
-/// 미래 예측
-final portfolioForecastProvider =
-FutureProvider<PortfolioForecast?>((ref) async {
-  final rec = await ref.watch(personalizedRecommendationProvider.future);
-  if (rec == null) return null;
+// ─────────────────────────────────────────
+// 추천 포트폴리오 미래 예측 Provider
+// ─────────────────────────────────────────
+final portfolioForecastProvider = Provider<PortfolioForecast>((ref) {
+  final portfolio = ref.watch(recommendedPortfolioProvider);
   return ForecastEngine.forecastPortfolio(
-    portfolio: rec.toMap(),
+    portfolio: portfolio,
     targetYears: 3,
   );
 });
 
-/// 섹터 필터 (홈 화면용)
+// ─────────────────────────────────────────
+// 선택된 섹터 필터 Provider
+// ─────────────────────────────────────────
 final selectedSectorProvider =
 StateProvider<StockSector>((ref) => StockSector.all);
 
-/// 필터링된 종목 리스트 (페르소나 점수로 정렬)
-final filteredStocksProvider =
-FutureProvider<List<StockModel>>((ref) async {
+// ─────────────────────────────────────────
+// 필터링된 주식 리스트 Provider
+// ─────────────────────────────────────────
+final filteredStocksProvider = Provider<List<StockModel>>((ref) {
   final selectedSector = ref.watch(selectedSectorProvider);
-  final persona = ref.watch(personaProfileProvider);
-  final all = await ref.watch(allStocksProvider.future);
+  final goal = ref.watch(userGoalProvider);
 
-  var filtered = selectedSector == StockSector.all
-      ? all
-      : all.where((s) => s.sector == selectedSector).toList();
-
-  if (persona != null) {
-    // 페르소나 점수로 정렬
-    filtered.sort((a, b) {
-      final sa = RecommendationEngine.scoreStock(stock: a, persona: persona);
-      final sb = RecommendationEngine.scoreStock(stock: b, persona: persona);
-      return sb.compareTo(sa);
-    });
-  } else {
-    // 페르소나 없으면 배당수익률 순
-    filtered.sort((a, b) => b.dividendYield.compareTo(a.dividendYield));
-  }
-  return filtered;
+  var stocks = StockDataService.getBySector(selectedSector);
+  // 성향 매칭 우선 정렬
+  stocks.sort((a, b) {
+    bool aMatch = a.suitableFor.contains(goal.profile);
+    bool bMatch = b.suitableFor.contains(goal.profile);
+    if (aMatch && !bMatch) return -1;
+    if (!aMatch && bMatch) return 1;
+    return b.dividendYield.compareTo(a.dividendYield);
+  });
+  return stocks;
 });
 
-/// 보유 포트폴리오 (실제 보유 종목)
+// ─────────────────────────────────────────
+// 사용자 보유 포트폴리오 Provider (실제 보유)
+// ─────────────────────────────────────────
 class PortfolioNotifier extends StateNotifier<List<PortfolioItem>> {
-  PortfolioNotifier() : super([]);
+  PortfolioNotifier() : super([
+    // 데모용 샘플 데이터
+    PortfolioItem(
+      stock: StockDataService.allStocks[0],
+      shares: 100,
+      avgPrice: 60000,
+    ),
+    PortfolioItem(
+      stock: StockDataService.allStocks[10],
+      shares: 500,
+      avgPrice: 11800,
+    ),
+  ]);
 
-  void add(StockModel stock, int shares, double avgPrice) {
-    state = [
-      ...state,
-      PortfolioItem(stock: stock, shares: shares, avgPrice: avgPrice),
-    ];
+  void addStock(StockModel stock, int shares, double avgPrice) {
+    state = [...state, PortfolioItem(stock: stock, shares: shares, avgPrice: avgPrice)];
   }
 
-  void remove(String code) {
-    state = state.where((p) => p.stock.code != code).toList();
+  void removeStock(String code) {
+    state = state.where((item) => item.stock.code != code).toList();
   }
 
   double get totalMonthlyDividend =>
-      state.fold(0.0, (a, p) => a + p.monthlyDividend);
+      state.fold(0.0, (sum, item) => sum + item.monthlyDividend);
 
-  double get totalValue => state.fold(0.0, (a, p) => a + p.totalValue);
+  double get totalValue =>
+      state.fold(0.0, (sum, item) => sum + item.totalValue);
 }
 
 final portfolioProvider =
 StateNotifierProvider<PortfolioNotifier, List<PortfolioItem>>((ref) {
   return PortfolioNotifier();
-});
-
-/// 단일 종목 상세
-final stockDetailProvider =
-FutureProvider.family<StockModel?, String>((ref, code) async {
-  final service = ref.watch(stockServiceProvider);
-  return service.fetchStock(code);
-});
-
-/// ─────────────────────────────────────────────────
-/// User Goal Notifier
-/// ─────────────────────────────────────────────────
-class UserGoalNotifier extends StateNotifier<UserGoal> {
-  UserGoalNotifier() : super(UserGoal.initial());
-
-  void updateMonthlyTarget(int target) {
-    state = state.copyWith(monthlyTarget: target);
-  }
-
-  void updateProfile(InvestmentProfile profile) {
-    state = state.copyWith(profile: profile);
-  }
-
-  void updateSectors(List<StockSector> sectors) {
-    state = state.copyWith(preferredSectors: sectors);
-  }
-}
-
-final userGoalProvider = StateNotifierProvider<UserGoalNotifier, UserGoal>((ref) {
-  return UserGoalNotifier();
 });

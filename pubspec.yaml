@@ -1,5 +1,5 @@
-name: monthly_money
-description: 배당나무 - 한국 배당주 포트폴리오 앱 (실시간 API 연동 v2)
+name: dividend_app
+description: 배당나무 - 한국 배당주 포트폴리오 앱
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -17,15 +17,11 @@ dependencies:
   # HTTP / API
   http: ^1.2.1
   dio: ^5.4.3+1
-  xml: ^6.5.0
-  archive: ^3.6.1                  # OpenDART corpCode.xml 압축 해제용
-  charset_converter: ^2.1.1        # KRX EUC-KR 디코딩
 
   # 로컬 저장소
-  shared_preferences: ^2.2.3       # KIS access_token 저장
-  hive: ^2.2.3                     # 종목/시세 캐시
+  shared_preferences: ^2.2.3
+  hive: ^2.2.3
   hive_flutter: ^1.1.0
-  flutter_secure_storage: ^9.2.2   # API 키 안전 보관
 
   # UI
   google_fonts: ^6.2.1
@@ -36,15 +32,31 @@ dependencies:
 
   # 유틸
   intl: ^0.19.0
+  freezed_annotation: ^2.4.1
+  json_annotation: ^4.9.0
   equatable: ^2.0.5
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.0
+  build_runner: ^2.4.9
+  freezed: ^2.5.2
+  json_serializable: ^6.8.0
+  hive_generator: ^2.0.1
 
 flutter:
   uses-material-design: true
+  fonts:
+    - family: NotoSansKR
+      fonts:
+        - asset: assets/fonts/NotoSansKR-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/NotoSansKR-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/NotoSansKR-Bold.ttf
+          weight: 700
   assets:
     - assets/
+    - assets/fonts/
     - assets/images/

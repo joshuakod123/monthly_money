@@ -7,8 +7,6 @@ import '../providers/app_providers.dart';
 import '../services/forecast_engine.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common_widgets.dart';
-import 'package:monthly_money/providers/app_providers.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 class StockDetailScreen extends ConsumerWidget {
   final StockModel stock;
@@ -283,7 +281,7 @@ class StockDetailScreen extends ConsumerWidget {
                   LineChartBarData(
                     spots: history
                         .map((h) =>
-                            FlSpot(h.year.toDouble(), h.amount.toDouble()))
+                        FlSpot(h.year.toDouble(), h.amount.toDouble()))
                         .toList(),
                     isCurved: true,
                     color: AppColors.primary,
@@ -557,19 +555,19 @@ class StockDetailScreen extends ConsumerWidget {
           const SizedBox(height: 12),
           // 예측치 (미래)
           ...forecasts.reversed.map((f) => _HistoryRow(
-                year: '${f.year}',
-                amount: f.predictedAmount,
-                yieldVal: f.predictedYield,
-                isPredicted: true,
-                trend: f.trend,
-              )),
+            year: '${f.year}',
+            amount: f.predictedAmount,
+            yieldVal: f.predictedYield,
+            isPredicted: true,
+            trend: f.trend,
+          )),
           // 실제 (과거)
           ...history.map((h) => _HistoryRow(
-                year: '${h.year}',
-                amount: h.amount,
-                yieldVal: h.yieldPercent,
-                isPredicted: false,
-              )),
+            year: '${h.year}',
+            amount: h.amount,
+            yieldVal: h.yieldPercent,
+            isPredicted: false,
+          )),
         ],
       ),
     );
@@ -721,14 +719,14 @@ class _HistoryRow extends StatelessWidget {
               trend == '상승'
                   ? Icons.trending_up_rounded
                   : trend == '하락'
-                      ? Icons.trending_down_rounded
-                      : Icons.trending_flat_rounded,
+                  ? Icons.trending_down_rounded
+                  : Icons.trending_flat_rounded,
               size: 14,
               color: trend == '상승'
                   ? AppColors.positive
                   : trend == '하락'
-                      ? AppColors.negative
-                      : AppColors.textSecondary,
+                  ? AppColors.negative
+                  : AppColors.textSecondary,
             ),
             const SizedBox(width: 4),
           ],

@@ -222,8 +222,8 @@ class ForecastEngine {
 
     double mean = returns.reduce((a, b) => a + b) / returns.length;
     double variance = returns
-            .map((r) => math.pow(r - mean, 2).toDouble())
-            .reduce((a, b) => a + b) /
+        .map((r) => math.pow(r - mean, 2).toDouble())
+        .reduce((a, b) => a + b) /
         returns.length;
     return math.sqrt(variance);
   }
