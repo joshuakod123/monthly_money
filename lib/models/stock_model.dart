@@ -1,22 +1,25 @@
 import 'package:flutter/material.dart';
 
-// 섹터 enum
+// ─────────────────────────────────────────────
+// Sector enum (UI 표기용 라벨/이모지/색)
+// ─────────────────────────────────────────────
 enum StockSector {
-  all('전체', '🌿'),
-  finance('금융', '🏦'),
-  telecom('통신', '📡'),
-  energy('에너지', '⚡'),
-  reit('리츠', '🏢'),
-  consumer('소비재', '🛒'),
-  industrial('산업재', '🔧'),
-  healthcare('헬스케어', '💊');
+  all('전체', '🌿', Color(0xFF8E8E93)),
+  finance('금융', '🏦', Color(0xFF4A6FA5)),
+  telecom('통신', '📡', Color(0xFF6B5B95)),
+  energy('에너지', '⚡', Color(0xFFE8A33D)),
+  reit('리츠', '🏢', Color(0xFF7BA098)),
+  consumer('소비재', '🛒', Color(0xFFC97B63)),
+  industrial('산업재', '🔧', Color(0xFF5A6E7C)),
+  healthcare('헬스케어', '💊', Color(0xFFB85C7A));
 
-  const StockSector(this.label, this.emoji);
+  const StockSector(this.label, this.emoji, this.defaultColor);
   final String label;
   final String emoji;
+  final Color defaultColor;
 }
 
-// 투자 성향 enum
+// 투자 성향
 enum InvestmentProfile {
   stable('안정형', '안정적인 수익을 중시하는 투자자'),
   balanced('균형형', '성장과 수익의 균형을 추구하는 투자자'),
@@ -28,7 +31,7 @@ enum InvestmentProfile {
   final String description;
 }
 
-// 배당 주기 enum
+// 배당 주기
 enum DividendFrequency {
   annual('연간 배당'),
   semiAnnual('반기 배당'),
@@ -39,89 +42,151 @@ enum DividendFrequency {
   final String label;
 }
 
-// 주식 모델
+// ─────────────────────────────────────────────
+// StockModel — 단일 종목
+//
+// 필수 항목은 code/name/sector/price/frequency 만 남기고
+// 나머지는 모두 기본값을 두어 API/마스터 둘 다에서 안전하게 생성 가능하게 함.
+// ─────────────────────────────────────────────
 class StockModel {
   final String code;
   final String name;
   final String nameEn;
   final StockSector sector;
   final double price;
-  final double dividendYield;          // 배당수익률 (%)
-  final int dividendPerShare;          // 주당 배당금 (원)
+  final double dividendYield;            // %
+  final int dividendPerShare;            // 원 (주당 연간)
+  final int latestDividend;              // 직전년도 배당 (서비스 호환용)
   final DividendFrequency frequency;
   final double per;
   final double pbr;
   final double roe;
-  final List<DividendHistory> history; // 최근 5년 배당 히스토리
+  final double eps;
+  final List<DividendHistory> history;
   final bool isRecommended;
   final List<InvestmentProfile> suitableFor;
-  final String riskLevel;              // 낮음 / 중간 / 높음
-  final double marketCap;             // 시가총액 (억원)
+  final String riskLevel;                // 낮음 / 중간 / 높음
+  final int marketCap;                   // 시가총액 (백만원)
   final Color sectorColor;
 
   const StockModel({
     required this.code,
     required this.name,
-    required this.nameEn,
+    this.nameEn = '',
     required this.sector,
     required this.price,
-    required this.dividendYield,
-    required this.dividendPerShare,
+    this.dividendYield = 0,
+    this.dividendPerShare = 0,
+    this.latestDividend = 0,
     required this.frequency,
-    required this.per,
-    required this.pbr,
-    required this.roe,
-    required this.history,
+    this.per = 0,
+    this.pbr = 0,
+    this.roe = 0,
+    this.eps = 0,
+    this.history = const [],
     this.isRecommended = false,
-    required this.suitableFor,
-    required this.riskLevel,
-    required this.marketCap,
-    required this.sectorColor,
+    this.suitableFor = const [],
+    this.riskLevel = '중간',
+    this.marketCap = 0,
+    this.sectorColor = const Color(0xFF8E8E93),
   });
 
-  // 월 배당금 환산 (주식 수 기준)
+  // ─────────────────────────────────────────
+  // copyWith — 부분 업데이트 (KIS/DART 응답 덮어쓰기)
+  // ─────────────────────────────────────────
+  StockModel copyWith({
+    String? code,
+    String? name,
+    String? nameEn,
+    StockSector? sector,
+    double? price,
+    double? dividendYield,
+    int? dividendPerShare,
+    int? latestDividend,
+    DividendFrequency? frequency,
+    double? per,
+    double? pbr,
+    double? roe,
+    double? eps,
+    List<DividendHistory>? history,
+    bool? isRecommended,
+    List<InvestmentProfile>? suitableFor,
+    String? riskLevel,
+    int? marketCap,
+    Color? sectorColor,
+  }) {
+    return StockModel(
+      code: code ?? this.code,
+      name: name ?? this.name,
+      nameEn: nameEn ?? this.nameEn,
+      sector: sector ?? this.sector,
+      price: price ?? this.price,
+      dividendYield: dividendYield ?? this.dividendYield,
+      dividendPerShare: dividendPerShare ?? this.dividendPerShare,
+      latestDividend: latestDividend ?? this.latestDividend,
+      frequency: frequency ?? this.frequency,
+      per: per ?? this.per,
+      pbr: pbr ?? this.pbr,
+      roe: roe ?? this.roe,
+      eps: eps ?? this.eps,
+      history: history ?? this.history,
+      isRecommended: isRecommended ?? this.isRecommended,
+      suitableFor: suitableFor ?? this.suitableFor,
+      riskLevel: riskLevel ?? this.riskLevel,
+      marketCap: marketCap ?? this.marketCap,
+      sectorColor: sectorColor ?? this.sectorColor,
+    );
+  }
+
+  // 월 환산 배당금 (보유 주식 수 기준)
   double monthlyDividend(int shares) {
+    final perShare = dividendPerShare > 0 ? dividendPerShare : latestDividend;
     switch (frequency) {
       case DividendFrequency.monthly:
-        return dividendPerShare * shares.toDouble();
+        return perShare * shares.toDouble();
       case DividendFrequency.quarterly:
-        return (dividendPerShare * shares) / 3;
+        return (perShare * shares) / 3;
       case DividendFrequency.semiAnnual:
-        return (dividendPerShare * shares) / 6;
+        return (perShare * shares) / 6;
       case DividendFrequency.annual:
-        return (dividendPerShare * shares) / 12;
+        return (perShare * shares) / 12;
     }
   }
 
-  // 목표 월 배당금 달성을 위한 필요 주식 수
   int sharesNeededForMonthly(int monthlyGoal) {
-    double monthlyPerShare = monthlyDividend(1);
-    if (monthlyPerShare <= 0) return 0;
-    return (monthlyGoal / monthlyPerShare).ceil();
+    final perShareMonthly = monthlyDividend(1);
+    if (perShareMonthly <= 0) return 0;
+    return (monthlyGoal / perShareMonthly).ceil();
   }
 
-  // 목표 달성을 위한 총 투자금
-  double investmentNeeded(int monthlyGoal) {
+  double investmentNeededForMonthly(int monthlyGoal) {
     return sharesNeededForMonthly(monthlyGoal) * price;
   }
 }
 
-// 배당 히스토리
+// ─────────────────────────────────────────────
+// DividendHistory — 배당 내역
+// yieldPercent / exDate 모두 옵셔널 (서비스/모델 둘 다 호환)
+// ─────────────────────────────────────────────
 class DividendHistory {
   final int year;
-  final int amount;       // 주당 배당금 (원)
+  final int amount;             // 주당 배당금 (원)
   final double yieldPercent;    // 배당수익률 (%)
   final bool isPaid;
+  final DateTime? exDate;
 
   const DividendHistory({
     required this.year,
     required this.amount,
-    required this.yieldPercent,
+    this.yieldPercent = 0,
     this.isPaid = true,
+    this.exDate,
   });
 }
 
-// 사용자 포트폴리오 보유 종목
+// ─────────────────────────────────────────────
+// PortfolioItem — 보유 종목
+// ─────────────────────────────────────────────
 class PortfolioItem {
   final StockModel stock;
   final int shares;
@@ -136,17 +201,20 @@ class PortfolioItem {
   double get totalValue => stock.price * shares;
   double get totalCost => avgPrice * shares;
   double get gainLoss => totalValue - totalCost;
-  double get gainLossPct => ((totalValue - totalCost) / totalCost) * 100;
+  double get gainLossPct =>
+      totalCost == 0 ? 0 : ((totalValue - totalCost) / totalCost) * 100;
   double get monthlyDividend => stock.monthlyDividend(shares);
   double get annualDividend => monthlyDividend * 12;
 }
 
-// 사용자 목표 설정
+// ─────────────────────────────────────────────
+// UserGoal — 사용자 목표
+// ─────────────────────────────────────────────
 class UserGoal {
-  final int monthlyTarget;        // 월 목표 배당금 (원)
-  final InvestmentProfile profile; // 투자 성향
-  final List<StockSector> preferredSectors; // 선호 섹터
-  final int investmentBudget;     // 추가 투자 가능 예산
+  final int monthlyTarget;
+  final InvestmentProfile profile;
+  final List<StockSector> preferredSectors;
+  final int investmentBudget;
 
   const UserGoal({
     required this.monthlyTarget,

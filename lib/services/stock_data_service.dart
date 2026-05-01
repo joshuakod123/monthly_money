@@ -8,12 +8,15 @@ import 'api/opendart_client.dart';
 import 'api/api_config.dart';
 
 /// ═══════════════════════════════════════════════════════════
-///  StockDataService v4
+///  StockDataService v5
 ///
-///  핵심 원칙:
+///  설계 철학:
 ///   1. **이름·섹터는 절대로 비지 않는다** — 마스터 DB 폴백
 ///   2. API 성공 시에만 동적 데이터(가격·PER) 덮어씀
 ///   3. 부분 실패 허용 — 한 종목 실패해도 다른 종목 정상 표시
+///   4. **정적 메서드 (`allStocks`, `getBySector`, `recommendPortfolio`)
+///      를 제공해 동기 UI 코드와도 호환**
+///        → providers/UI 가 비동기로 다시 짜이기 전까지의 어댑터
 /// ═══════════════════════════════════════════════════════════
 class StockDataService {
   StockDataService._();
@@ -28,6 +31,10 @@ class StockDataService {
     await Hive.initFlutter();
     _cache = await Hive.openBox('stock_cache');
   }
+
+  // ════════════════════════════════════════════════════════════
+  // 🟢 인스턴스 메서드 (실 API 호출)
+  // ════════════════════════════════════════════════════════════
 
   /// 단일 종목 조회 — 마스터 DB 기반 + API 동적 데이터 덮어쓰기
   Future<StockModel?> fetchStock(String code) async {
@@ -49,7 +56,7 @@ class StockDataService {
     // 1) 폴백 데이터로 기본 모델 생성
     var model = _modelFromMaster(master);
 
-    // 2) KIS 가격 시도 (실패해도 폴백 유지)
+    // 2) KIS 가격 시도
     if (ApiConfig.isConfigured) {
       try {
         final priceData = await _kis.getCurrentPrice(code);
@@ -61,39 +68,41 @@ class StockDataService {
             marketCap: priceData.marketCap ?? model.marketCap,
           );
         }
-      } catch (e) {
+      } catch (_) {
         debugPrint('KIS 실패 (폴백 사용): $code');
       }
 
-      // 3) OpenDART 배당 이력 (실패해도 폴백 유지)
+      // 3) OpenDART 배당 이력
       try {
         final dividendData = await _dart.getDividendHistory(
           stockCode: code,
           years: ApiConfig.dividendHistoryYears,
         );
         if (dividendData.isNotEmpty) {
-          // DividendData → DividendHistory 변환
           final history = dividendData
-              .where((d) => d.cashDividendPerShare != null && d.cashDividendPerShare! > 0)
+              .where((d) =>
+          d.cashDividendPerShare != null &&
+              d.cashDividendPerShare! > 0)
               .map((d) => DividendHistory(
             year: d.year,
             amount: d.cashDividendPerShare!,
+            yieldPercent: d.cashDividendYield ?? 0,
             exDate: DateTime(d.year, 12, 28),
           ))
               .toList();
           if (history.isNotEmpty) {
-            // 최신 배당으로 latestDividend 업데이트
             final latest = history.last;
             model = model.copyWith(
               history: history,
               latestDividend: latest.amount,
+              dividendPerShare: latest.amount,
               dividendYield: model.price > 0
                   ? (latest.amount / model.price) * 100
                   : model.dividendYield,
             );
           }
         }
-      } catch (e) {
+      } catch (_) {
         debugPrint('DART 실패 (폴백 사용): $code');
       }
     }
@@ -109,7 +118,7 @@ class StockDataService {
     return model;
   }
 
-  /// 추천 종목 목록 (전체 마스터 DB)
+  /// 추천 종목 목록 (전체 마스터 DB → API 호출)
   Future<List<StockModel>> getRecommendedStocks() async {
     final results = <StockModel>[];
     for (final m in StockMasterDB.all) {
@@ -119,40 +128,166 @@ class StockDataService {
     return results;
   }
 
+  // ════════════════════════════════════════════════════════════
+  // 🟡 정적 호환 메서드 — 동기 UI 코드 호환용
+  //
+  // 기존 providers / screens 코드는 동기 호출을 가정.
+  // 이를 깨지 않기 위해 마스터 DB 폴백 데이터로 구성된 동기 API를 제공.
+  // 추후 점진적으로 비동기로 마이그레이션 권장.
+  // ════════════════════════════════════════════════════════════
+
+  /// 모든 종목 (폴백 데이터 기반)
+  static List<StockModel> get allStocks {
+    return StockMasterDB.all.map(_staticModelFromMaster).toList();
+  }
+
+  /// 섹터별 필터
+  static List<StockModel> getBySector(StockSector sector) {
+    if (sector == StockSector.all) return allStocks;
+    return allStocks.where((s) => s.sector == sector).toList();
+  }
+
+  /// 단순 추천 알고리즘 (성향 + 섹터 + 목표 기반)
+  static Map<StockModel, int> recommendPortfolio({
+    required int monthlyGoal,
+    required InvestmentProfile profile,
+    required List<StockSector> preferredSectors,
+  }) {
+    var candidates = allStocks;
+
+    // 섹터 필터 (전체가 아니면)
+    if (!preferredSectors.contains(StockSector.all) &&
+        preferredSectors.isNotEmpty) {
+      candidates = candidates
+          .where((s) => preferredSectors.contains(s.sector))
+          .toList();
+    }
+    if (candidates.isEmpty) candidates = allStocks;
+
+    // 성향별 정렬
+    candidates.sort((a, b) {
+      switch (profile) {
+        case InvestmentProfile.stable:
+        // 낮은 PER + 높은 시총
+          final aScore = (a.per > 0 ? 30 / a.per : 0) + a.marketCap / 1e7;
+          final bScore = (b.per > 0 ? 30 / b.per : 0) + b.marketCap / 1e7;
+          return bScore.compareTo(aScore);
+        case InvestmentProfile.balanced:
+          return b.dividendYield.compareTo(a.dividendYield);
+        case InvestmentProfile.growth:
+          return b.roe.compareTo(a.roe);
+        case InvestmentProfile.highYield:
+          return b.dividendYield.compareTo(a.dividendYield);
+      }
+    });
+
+    // 상위 5종목으로 균등 분배
+    final picks = candidates.take(5).toList();
+    if (picks.isEmpty) return {};
+
+    final perStockMonthlyGoal = monthlyGoal / picks.length;
+    final result = <StockModel, int>{};
+    for (final stock in picks) {
+      final shares = stock.sharesNeededForMonthly(perStockMonthlyGoal.round());
+      if (shares > 0) result[stock] = shares;
+    }
+    return result;
+  }
+
+  // ════════════════════════════════════════════════════════════
+  // 내부 헬퍼
+  // ════════════════════════════════════════════════════════════
+
   StockModel _modelFromMaster(StockMaster m) {
-    // 가짜 5년 배당 이력 생성 (DART 실패 시 폴백용)
+    return _staticModelFromMaster(m);
+  }
+
+  /// 마스터 → StockModel (정적 / 인스턴스 공통)
+  static StockModel _staticModelFromMaster(StockMaster m) {
+    // 가짜 5년 배당 이력 (DART 실패 시 폴백)
     final now = DateTime.now();
     final history = <DividendHistory>[];
     for (int i = 4; i >= 0; i--) {
       final year = now.year - i;
-      // 약간의 변동 추가 (안정성 시뮬레이션)
-      final factor = 0.85 + (i * 0.04) + (math.Random(m.code.hashCode + i).nextDouble() * 0.1);
+      final factor = 0.85 +
+          (i * 0.04) +
+          (math.Random(m.code.hashCode + i).nextDouble() * 0.1);
       final amount = (m.fallbackDividend * factor).round();
       history.add(DividendHistory(
         year: year,
         amount: amount,
+        yieldPercent: m.fallbackPrice > 0
+            ? (amount / m.fallbackPrice) * 100
+            : m.fallbackYield,
         exDate: DateTime(year, 12, 28),
       ));
     }
 
+    final latest = history.last.amount;
+
     return StockModel(
       code: m.code,
       name: m.name,
+      nameEn: '',
       sector: m.sector,
-      frequency: m.frequency,
       price: m.fallbackPrice,
+      dividendYield: m.fallbackYield,
+      dividendPerShare: latest,
+      latestDividend: latest,
+      frequency: m.frequency,
       per: m.fallbackPer,
       pbr: 0.6,
+      roe: m.fallbackPer > 0 ? 100 / m.fallbackPer : 8,
       eps: m.fallbackPer > 0 ? m.fallbackPrice / m.fallbackPer : 0,
-      marketCap: m.fallbackMarketCap,
-      dividendYield: m.fallbackYield,
-      latestDividend: m.fallbackDividend.round(),
       history: history,
+      isRecommended: true,
+      suitableFor: _suitableForFromSector(m.sector, m.fallbackYield),
+      riskLevel: _riskFromSector(m.sector),
+      marketCap: m.fallbackMarketCap,
+      sectorColor: m.sector.defaultColor,
     );
   }
 
+  static List<InvestmentProfile> _suitableForFromSector(
+      StockSector sector, double yieldVal) {
+    final list = <InvestmentProfile>[];
+    if (yieldVal >= 5.5) list.add(InvestmentProfile.highYield);
+    if (yieldVal >= 3.5) list.add(InvestmentProfile.balanced);
+    switch (sector) {
+      case StockSector.finance:
+      case StockSector.telecom:
+      case StockSector.energy:
+        list.add(InvestmentProfile.stable);
+        break;
+      case StockSector.healthcare:
+      case StockSector.industrial:
+        list.add(InvestmentProfile.growth);
+        break;
+      case StockSector.reit:
+        list.add(InvestmentProfile.highYield);
+        break;
+      default:
+        break;
+    }
+    return list.isEmpty ? [InvestmentProfile.balanced] : list;
+  }
+
+  static String _riskFromSector(StockSector sector) {
+    switch (sector) {
+      case StockSector.finance:
+      case StockSector.telecom:
+        return '낮음';
+      case StockSector.reit:
+      case StockSector.consumer:
+      case StockSector.energy:
+        return '중간';
+      default:
+        return '중간';
+    }
+  }
+
   StockModel _modelFromCache(StockMaster m, Map<String, dynamic> cache) {
-    var model = _modelFromMaster(m);
+    var model = _staticModelFromMaster(m);
     if (cache['price'] is num) {
       model = model.copyWith(price: (cache['price'] as num).toDouble());
     }

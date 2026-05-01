@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/stock_model.dart';
 import '../services/stock_data_service.dart';
 import '../services/forecast_engine.dart';
+import '../algorithms/persona_profile.dart';
 
 // ─────────────────────────────────────────
 // 사용자 목표 설정 Provider
@@ -58,10 +59,15 @@ StateNotifierProvider<UserGoalNotifier, UserGoal>((ref) {
 });
 
 // ─────────────────────────────────────────
+// PersonaProfile Provider — 퀴즈 결과
+// (퀴즈 미완료 상태는 null)
+// ─────────────────────────────────────────
+final personaProfileProvider = StateProvider<PersonaProfile?>((ref) => null);
+
+// ─────────────────────────────────────────
 // 추천 포트폴리오 Provider (목표 + 성향 기반)
 // ─────────────────────────────────────────
-final recommendedPortfolioProvider =
-Provider<Map<StockModel, int>>((ref) {
+final recommendedPortfolioProvider = Provider<Map<StockModel, int>>((ref) {
   final goal = ref.watch(userGoalProvider);
   return StockDataService.recommendPortfolio(
     monthlyGoal: goal.monthlyTarget,
@@ -110,22 +116,33 @@ final filteredStocksProvider = Provider<List<StockModel>>((ref) {
 // 사용자 보유 포트폴리오 Provider (실제 보유)
 // ─────────────────────────────────────────
 class PortfolioNotifier extends StateNotifier<List<PortfolioItem>> {
-  PortfolioNotifier() : super([
-    // 데모용 샘플 데이터
-    PortfolioItem(
-      stock: StockDataService.allStocks[0],
+  PortfolioNotifier()
+      : super(_initialDemoPortfolio());
+
+  static List<PortfolioItem> _initialDemoPortfolio() {
+    final all = StockDataService.allStocks;
+    if (all.isEmpty) return [];
+    final items = <PortfolioItem>[];
+    items.add(PortfolioItem(
+      stock: all.first,
       shares: 100,
-      avgPrice: 60000,
-    ),
-    PortfolioItem(
-      stock: StockDataService.allStocks[10],
-      shares: 500,
-      avgPrice: 11800,
-    ),
-  ]);
+      avgPrice: all.first.price * 0.85,
+    ));
+    if (all.length > 10) {
+      items.add(PortfolioItem(
+        stock: all[10],
+        shares: 500,
+        avgPrice: all[10].price * 0.9,
+      ));
+    }
+    return items;
+  }
 
   void addStock(StockModel stock, int shares, double avgPrice) {
-    state = [...state, PortfolioItem(stock: stock, shares: shares, avgPrice: avgPrice)];
+    state = [
+      ...state,
+      PortfolioItem(stock: stock, shares: shares, avgPrice: avgPrice),
+    ];
   }
 
   void removeStock(String code) {
