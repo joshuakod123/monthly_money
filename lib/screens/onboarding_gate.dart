@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../providers/app_providers.dart';
-import '../../theme/app_theme.dart';
-import '../main_scaffold.dart';
-import '../quiz_screen.dart';
+import '../providers/app_providers.dart';
+import '../theme/app_theme.dart';
+import 'main_scaffold.dart';
+import 'quiz_screen.dart';
 
 /// ═══════════════════════════════════════════════════════════
 ///  OnboardingGate — 퀴즈 완료 여부에 따라 분기

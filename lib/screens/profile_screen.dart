@@ -1,116 +1,110 @@
 import 'package:flutter/material.dart';
-import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../models/stock_model.dart';
 import '../providers/app_providers.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common_widgets.dart';
+import 'quiz_screen.dart';
 
-class CalendarScreen extends ConsumerWidget {
-  const CalendarScreen({super.key});
+class ProfileScreen extends ConsumerWidget {
+  const ProfileScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final rec = ref.watch(portfolioRecommendationProvider);
-    final monthly = ref.watch(monthlyDividendCalendarProvider);
+    final persona = ref.watch(personaProfileProvider);
 
     return Scaffold(
       backgroundColor: AppColors.bgPage,
       appBar: AppBar(
-        title: const Text('배당 캘린더',
+        title: const Text('내 정보',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
       ),
-      body: rec == null
-          ? const Center(
-        child: Text('퀴즈를 먼저 완료해주세요',
-            style: TextStyle(color: AppColors.textSecondary)),
-      )
-          : SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 100),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── 연 합계 헤더
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: AppColors.bgCard,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppColors.border),
+            if (persona != null) ...[
+              const Text('내 투자 성향',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 13,
+                  )),
+              const SizedBox(height: 4),
+              Text(persona.summarize(),
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.5,
+                  )),
+              const SizedBox(height: 24),
+
+              // 8차원 점수 카드
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppColors.bgCard,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Column(
+                  children: [
+                    _DimRow(label: '시간 지평', value: persona.horizon, lo: '단기', hi: '장기'),
+                    _DimRow(label: '현금흐름', value: persona.cashflowPreference, lo: '월급형', hi: '보너스형'),
+                    _DimRow(label: '하방 방어', value: persona.downsideTolerance, lo: '방어', hi: '공격'),
+                    _DimRow(label: '세금 민감도', value: -persona.taxSensitivity, lo: '신경 안 씀', hi: '회피'),
+                    _DimRow(label: '유동성', value: persona.liquidityNeed, lo: '필요', hi: '묶어둠'),
+                    _DimRow(label: 'ESG 윤리', value: -persona.ethicsLooseness, lo: '느슨', hi: '엄격'),
+                    _DimRow(label: '분산도', value: persona.diversificationDemand, lo: '집중', hi: '분산'),
+                    _DimRow(label: '인플레이션 헷지', value: persona.inflationHedge, lo: '약함', hi: '강함'),
+                  ],
+                ),
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('연 예상 배당',
-                      style: TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 12,
-                      )),
-                  const SizedBox(height: 4),
-                  Text(
-                    formatKRW(monthly.fold(0.0, (a, b) => a + b).round()),
-                    style: const TextStyle(
+              const SizedBox(height: 16),
+
+              // 목표 카드
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppColors.bgCard,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Column(
+                  children: [
+                    _GoalRow(label: '월 배당 목표', value: formatKRW(persona.monthlyTarget)),
+                    const SizedBox(height: 12),
+                    _GoalRow(label: '투자 예산', value: formatKRW(persona.budget)),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+            ],
+
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const QuizScreen()),
+                  );
+                },
+                icon: const Icon(Icons.refresh_rounded,
+                    color: AppColors.primary),
+                label: const Text('퀴즈 다시 풀기',
+                    style: TextStyle(
                       color: AppColors.primary,
-                      fontSize: 28,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -1,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '월 평균 ${formatKRW((monthly.fold(0.0, (a, b) => a + b) / 12).round())}',
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 11,
-                    ),
-                  ),
-                ],
+                      fontWeight: FontWeight.w700,
+                    )),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  side: const BorderSide(color: AppColors.primary),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
+                ),
               ),
             ),
-            const SizedBox(height: 16),
-
-            // ── 12개월 바 차트
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: AppColors.bgCard,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('월별 배당 패턴',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
-                      )),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    height: 160,
-                    child: _MonthlyBarChart(monthly: monthly),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-
-            // ── 월별 상세 카드
-            ...List.generate(12, (i) {
-              final month = i + 1;
-              final amount = monthly[i];
-              final picks = rec.picks
-                  .where((p) =>
-              p.stock.paymentMonths.contains(month) &&
-                  _stockMonthlyAmount(p.stock, p.shares) > 0)
-                  .toList();
-              return _MonthCard(
-                month: month,
-                amount: amount,
-                picks: picks,
-              );
-            }),
           ],
         ),
       ),
@@ -118,159 +112,95 @@ class CalendarScreen extends ConsumerWidget {
   }
 }
 
-double _stockMonthlyAmount(StockModel stock, int shares) {
-  final annual = stock.dividendPerShare > 0
-      ? stock.dividendPerShare
-      : stock.latestDividend;
-  if (annual == 0 || stock.paymentMonths.isEmpty) return 0;
-  return (annual / stock.paymentMonths.length) * shares;
-}
-
-class _MonthlyBarChart extends StatelessWidget {
-  final List<double> monthly;
-  const _MonthlyBarChart({required this.monthly});
-
-  @override
-  Widget build(BuildContext context) {
-    final maxV = monthly.reduce((a, b) => a > b ? a : b);
-    if (maxV == 0) {
-      return const Center(
-        child: Text('배당 지급 데이터가 없습니다',
-            style: TextStyle(color: AppColors.textHint, fontSize: 12)),
-      );
-    }
-
-    return BarChart(
-      BarChartData(
-        maxY: maxV * 1.2,
-        gridData: const FlGridData(show: false),
-        borderData: FlBorderData(show: false),
-        titlesData: FlTitlesData(
-          topTitles:
-          const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          rightTitles:
-          const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          leftTitles:
-          const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          bottomTitles: AxisTitles(
-            sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 22,
-              interval: 1,
-              getTitlesWidget: (value, _) => Text('${value.toInt() + 1}',
-                  style: const TextStyle(
-                    color: AppColors.textHint,
-                    fontSize: 10,
-                  )),
-            ),
-          ),
-        ),
-        barGroups: List.generate(12, (i) {
-          return BarChartGroupData(
-            x: i,
-            barRods: [
-              BarChartRodData(
-                toY: monthly[i],
-                color: monthly[i] > 0
-                    ? AppColors.primary
-                    : AppColors.border,
-                width: 14,
-                borderRadius: BorderRadius.circular(4),
-              ),
-            ],
-          );
-        }),
-      ),
-    );
-  }
-}
-
-class _MonthCard extends StatelessWidget {
-  final int month;
-  final double amount;
-  final List<dynamic> picks; // PortfolioPick
-  const _MonthCard(
-      {required this.month, required this.amount, required this.picks});
+class _DimRow extends StatelessWidget {
+  final String label;
+  final double value; // -1 ~ +1
+  final String lo, hi;
+  const _DimRow({
+    required this.label,
+    required this.value,
+    required this.lo,
+    required this.hi,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final hasPayout = amount > 0;
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: hasPayout
-              ? AppColors.primary.withValues(alpha: 0.3)
-              : AppColors.border,
-        ),
-      ),
+    final normalized = ((value + 1) / 2).clamp(0.0, 1.0);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              Text('$month월',
-                  style: const TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
-                  )),
-              if (hasPayout)
-                Text(formatKRW(amount.round()),
+              Expanded(
+                child: Text(label,
                     style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.primary,
-                      letterSpacing: -0.5,
-                    ))
-              else
-                const Text('지급 없음',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textHint,
+                      color: AppColors.textPrimary,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
                     )),
+              ),
+              Text(lo,
+                  style: const TextStyle(
+                    color: AppColors.textHint,
+                    fontSize: 10,
+                  )),
+              const SizedBox(width: 6),
+              Text(hi,
+                  style: const TextStyle(
+                    color: AppColors.textHint,
+                    fontSize: 10,
+                  )),
             ],
           ),
-          if (picks.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            const Divider(color: AppColors.border, height: 1),
-            const SizedBox(height: 12),
-            ...picks.map((pick) {
-              final amt = _stockMonthlyAmount(pick.stock, pick.shares);
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  children: [
-                    Text(pick.stock.sector.emoji,
-                        style: const TextStyle(fontSize: 14)),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        '${pick.stock.name} (${pick.shares}주)',
-                        style: const TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                    Text(formatKRW(amt.round()),
-                        style: const TextStyle(
-                          color: AppColors.textPrimary,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        )),
-                  ],
+          const SizedBox(height: 6),
+          Stack(
+            children: [
+              Container(
+                height: 6,
+                decoration: BoxDecoration(
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(99),
                 ),
-              );
-            }),
-          ],
+              ),
+              FractionallySizedBox(
+                widthFactor: normalized,
+                child: Container(
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
+}
+
+class _GoalRow extends StatelessWidget {
+  final String label;
+  final String value;
+  const _GoalRow({required this.label, required this.value});
+  @override
+  Widget build(BuildContext context) => Row(
+    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    children: [
+      Text(label,
+          style: const TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 13,
+          )),
+      Text(value,
+          style: const TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+          )),
+    ],
+  );
 }
