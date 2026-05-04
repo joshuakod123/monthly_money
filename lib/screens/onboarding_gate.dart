@@ -1,93 +1,196 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../providers/app_providers.dart';
 import '../theme/app_theme.dart';
 import 'main_scaffold.dart';
 import 'quiz_screen.dart';
 
-/// ═══════════════════════════════════════════════════════════
-///  OnboardingGate — 퀴즈 완료 여부에 따라 분기
-///   - 퀴즈 완료 → MainScaffold (홈)
-///   - 미완료 → QuizScreen (강제 온보딩)
-/// ═══════════════════════════════════════════════════════════
 class OnboardingGate extends ConsumerWidget {
   const OnboardingGate({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final persona = ref.watch(personaProfileProvider);
-
-    // SharedPreferences 로딩 중이면 잠깐 빈 화면 (수십 ms)
-    // null 이면 퀴즈 미완료 → 퀴즈 진입
-    if (persona == null) {
-      return const _WelcomeScreen();
-    }
+    if (persona == null) return const _WelcomeScreen();
     return const MainScaffold();
   }
 }
 
-/// 환영 + 퀴즈 시작 화면
 class _WelcomeScreen extends StatelessWidget {
   const _WelcomeScreen();
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.bgPage,
+      backgroundColor: AppColors.canvas,
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(32),
+          padding: const EdgeInsets.fromLTRB(28, 20, 28, 32),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // 상단: 작은 라벨
+              Row(
+                children: [
+                  Container(width: 32, height: 1.5, color: AppColors.wine),
+                  const SizedBox(width: 10),
+                  Text(
+                    'EST. 2026',
+                    style: GoogleFonts.inter(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.wine,
+                      letterSpacing: 2.5,
+                    ),
+                  ),
+                ],
+              ).animate().fadeIn(duration: 400.ms),
+
               const Spacer(flex: 2),
-              const Text('🌱', style: TextStyle(fontSize: 64)),
+
+              // 로고/심볼
+              Text(
+                '※',
+                style: GoogleFonts.playfairDisplay(
+                  fontSize: 80,
+                  color: AppColors.wine,
+                  fontWeight: FontWeight.w400,
+                ),
+              ).animate().fadeIn(delay: 200.ms, duration: 600.ms),
+
               const SizedBox(height: 24),
-              const Text(
+
+              // 메인 헤드라인
+              Text(
                 '배당나무',
-                style: TextStyle(
-                  fontSize: 36,
-                  fontWeight: FontWeight.w800,
+                style: GoogleFonts.playfairDisplay(
+                  fontSize: 56,
+                  fontWeight: FontWeight.w700,
                   color: AppColors.textPrimary,
-                  letterSpacing: -1,
+                  letterSpacing: -2,
+                  height: 1,
                 ),
-              ),
+              )
+                  .animate()
+                  .fadeIn(delay: 400.ms, duration: 480.ms)
+                  .slideY(begin: 0.05),
+
               const SizedBox(height: 12),
-              const Text(
-                '8가지 질문으로\n나에게 딱 맞는\n배당 포트폴리오를 만들어요',
-                style: TextStyle(
-                  fontSize: 18,
-                  color: AppColors.textSecondary,
-                  height: 1.5,
+
+              Text(
+                'Baedang Namu',
+                style: GoogleFonts.playfairDisplay(
+                  fontSize: 16,
+                  fontStyle: FontStyle.italic,
+                  color: AppColors.textTertiary,
+                  letterSpacing: 0.5,
                 ),
-              ),
+              ).animate().fadeIn(delay: 600.ms, duration: 320.ms),
+
+              const SizedBox(height: 40),
+
+              // 설명
+              Container(
+                width: 32,
+                height: 1,
+                color: AppColors.wine.withValues(alpha: 0.4),
+              ).animate().fadeIn(delay: 700.ms),
+
+              const SizedBox(height: 20),
+
+              Text(
+                '8가지 질문으로\n당신의 투자 본능을\n발견합니다',
+                style: GoogleFonts.playfairDisplay(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.textPrimary,
+                  letterSpacing: -0.4,
+                  height: 1.4,
+                ),
+              )
+                  .animate()
+                  .fadeIn(delay: 800.ms, duration: 480.ms)
+                  .slideY(begin: 0.03),
+
+              const SizedBox(height: 12),
+
+              Text(
+                '시간이 당신의 자산을 익혀줍니다',
+                style: GoogleFonts.inter(
+                  fontSize: 13,
+                  color: AppColors.textTertiary,
+                  fontStyle: FontStyle.italic,
+                  height: 1.6,
+                ),
+              ).animate().fadeIn(delay: 1000.ms),
+
               const Spacer(flex: 3),
+
+              // CTA
               SizedBox(
                 width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () async {
-                    await Navigator.push(
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (_) => const QuizScreen()),
+                      MaterialPageRoute(
+                          builder: (_) => const QuizScreen()),
                     );
-                    // 퀴즈에서 setProfile 호출되면 OnboardingGate가 자동 리빌드돼서 MainScaffold로 감
                   },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.black,
+                  child: Container(
                     padding: const EdgeInsets.symmetric(vertical: 18),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.wine,
+                      borderRadius: BorderRadius.circular(AppRadius.md),
                     ),
-                    elevation: 0,
-                  ),
-                  child: const Text(
-                    '시작하기',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                    child: Row(
+                      children: [
+                        const SizedBox(width: 24),
+                        Text(
+                          '시작하기',
+                          style: GoogleFonts.inter(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.surface,
+                            letterSpacing: -0.2,
+                          ),
+                        ),
+                        const Spacer(),
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: AppColors.wineDeep,
+                            borderRadius: BorderRadius.circular(AppRadius.sm),
+                          ),
+                          child: const Icon(
+                            Icons.arrow_forward_rounded,
+                            size: 18,
+                            color: AppColors.surface,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 24),
+              ).animate().fadeIn(delay: 1200.ms, duration: 480.ms),
+
+              const SizedBox(height: 16),
+
+              Center(
+                child: Text(
+                  '· 약 2분 소요 ·',
+                  style: GoogleFonts.playfairDisplay(
+                    fontSize: 11,
+                    fontStyle: FontStyle.italic,
+                    color: AppColors.textTertiary,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+              ).animate().fadeIn(delay: 1400.ms),
             ],
           ),
         ),

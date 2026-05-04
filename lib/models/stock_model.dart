@@ -112,6 +112,12 @@ class StockModel {
     final perShare = dividendPerShare > 0 ? dividendPerShare : latestDividend;
     return (perShare * shares) / 12;
   }
+  double dividendForMonth(int shares, int month) {
+    final perShare = dividendPerShare > 0 ? dividendPerShare : latestDividend;
+    if (perShare == 0 || !paymentMonths.contains(month)) return 0;
+    // 한 번 지급할 때 들어오는 금액 = 연간 / 지급 횟수
+    return (perShare / paymentMonths.length) * shares;
+  }
 
   int sharesNeededForMonthly(int monthlyGoal) {
     final perShareMonthly = monthlyDividend(1);

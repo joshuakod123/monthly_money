@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import '../models/stock_model.dart';
-import '../providers/app_providers.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../algorithms/persona_animal.dart';
 import '../algorithms/recommendation_engine.dart';
+import '../providers/app_providers.dart';
 import '../theme/app_theme.dart';
-import '../widgets/common_widgets.dart';
 import 'stock_detail_screen.dart';
+import 'quiz_result_screen.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -16,281 +16,515 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final persona = ref.watch(personaProfileProvider);
     final rec = ref.watch(portfolioRecommendationProvider);
-    final forecast = ref.watch(portfolioForecastProvider);
 
     if (persona == null || rec == null) {
       return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+        backgroundColor: AppColors.canvas,
+        body: Center(child: CircularProgressIndicator(color: AppColors.wine)),
       );
     }
 
+    final animal = PersonaAnimal.fromProfile(persona);
+
     return Scaffold(
-      backgroundColor: AppColors.bgPage,
+      backgroundColor: AppColors.canvas,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // ── 헤더 — 퍼소나 요약
-              Text('당신은',
-                  style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 14,
-                  )),
-              const SizedBox(height: 4),
-              Text(
-                persona.summarize(),
-                style: const TextStyle(
-                  color: AppColors.textPrimary,
-                  fontSize: 24,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.5,
-                ),
-              ).animate().fadeIn(duration: 300.ms),
-              const SizedBox(height: 4),
-              Text(
-                '${persona.picks(rec)}개 종목으로 월 ${formatKRW(rec.totalMonthlyDividend.round())} 받는 포트폴리오를 추천해요',
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 13,
-                  height: 1.5,
-                ),
+        bottom: false,
+        child: CustomScrollView(
+          physics: const BouncingScrollPhysics(),
+          slivers: [
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 12, 24, 0),
+                child: _Greeting(animal: animal),
               ),
-
-              const SizedBox(height: 28),
-
-              // ── 핵심 KPI 카드 (월 배당 / 총 투자금 / 분산도)
-              _SummaryCard(rec: rec, forecast: forecast),
-
-              const SizedBox(height: 24),
-
-              // ── 도넛 차트 (섹터별 비중)
-              _SectorDonut(rec: rec)
-                  .animate()
-                  .fadeIn(delay: 100.ms, duration: 400.ms),
-
-              const SizedBox(height: 24),
-
-              // ── 추천 이유
-              _RationaleCard(reasons: rec.rationale())
-                  .animate()
-                  .fadeIn(delay: 200.ms, duration: 400.ms),
-
-              const SizedBox(height: 24),
-
-              // ── 종목 리스트 (비중 큰 순)
-              const Text('포트폴리오 구성',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimary,
-                  )),
-              const SizedBox(height: 12),
-              ...rec.picks.asMap().entries.map((entry) {
-                final i = entry.key;
-                final pick = entry.value;
-                return _PickCard(pick: pick)
-                    .animate()
-                    .fadeIn(
-                  delay: Duration(milliseconds: 300 + i * 60),
-                  duration: 380.ms,
-                )
-                    .slideY(begin: 0.08);
-              }),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─── helper extension ─────────────────────────────
-extension on dynamic {
-  int picks(PortfolioRecommendation rec) => rec.picks.length;
-}
-
-// ─── 요약 카드 ────────────────────────────────────
-class _SummaryCard extends StatelessWidget {
-  final PortfolioRecommendation rec;
-  final dynamic forecast; // PortfolioForecast?
-  const _SummaryCard({required this.rec, required this.forecast});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppColors.primary.withValues(alpha: 0.18),
-            AppColors.bgCard,
-          ],
-        ),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('월 예상 배당',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-          const SizedBox(height: 4),
-          Text(
-            formatKRW(rec.totalMonthlyDividend.round()),
-            style: const TextStyle(
-              color: AppColors.primary,
-              fontSize: 32,
-              fontWeight: FontWeight.w800,
-              letterSpacing: -1,
             ),
-          ),
-          Text('목표 ${formatKRW(rec.persona.monthlyTarget)} 대비 '
-              '${((rec.totalMonthlyDividend / rec.persona.monthlyTarget) * 100).round()}%',
-              style: const TextStyle(
-                color: AppColors.accent,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-              )),
-          const Divider(color: AppColors.border, height: 28),
-          Row(
-            children: [
-              Expanded(
-                child: _MiniStat(
-                  label: '필요 투자금',
-                  value: formatKRW(rec.totalInvestment),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 28, 24, 24),
+                child: _AnimalBanner(animal: animal),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 28),
+                child: _MonthlyHero(persona: persona, rec: rec),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 28),
+                child: _WineCard(rec: rec, animal: animal)
+                    .animate()
+                    .fadeIn(delay: 500.ms, duration: 480.ms)
+                    .slideY(begin: 0.05, end: 0),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+                child: _PortfolioHeader(count: rec.picks.length),
+              ),
+            ),
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                      (context, i) {
+                    return _PickRow(
+                      pick: rec.picks[i],
+                      isLast: i == rec.picks.length - 1,
+                    )
+                        .animate()
+                        .fadeIn(
+                      delay: Duration(milliseconds: 700 + i * 50),
+                      duration: 320.ms,
+                    )
+                        .slideX(begin: 0.03, end: 0);
+                  },
+                  childCount: rec.picks.length,
                 ),
               ),
-              Container(width: 1, height: 30, color: AppColors.border),
-              Expanded(
-                child: _MiniStat(
-                  label: '분산 점수',
-                  value: '${(rec.diversityScore * 100).round()}점',
-                ),
-              ),
-              Container(width: 1, height: 30, color: AppColors.border),
-              Expanded(
-                child: _MiniStat(
-                  label: '종목 수',
-                  value: '${rec.picks.length}개',
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _MiniStat extends StatelessWidget {
-  final String label;
-  final String value;
-  const _MiniStat({required this.label, required this.value});
-  @override
-  Widget build(BuildContext context) => Column(
-    children: [
-      Text(label,
-          style: const TextStyle(
-            color: AppColors.textSecondary,
-            fontSize: 10,
-          )),
-      const SizedBox(height: 4),
-      Text(value,
-          style: const TextStyle(
-            color: AppColors.textPrimary,
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-          )),
-    ],
-  );
-}
-
-// ─── 섹터 도넛 차트 ──────────────────────────────
-class _SectorDonut extends StatelessWidget {
-  final PortfolioRecommendation rec;
-  const _SectorDonut({required this.rec});
-
-  @override
-  Widget build(BuildContext context) {
-    final breakdown = rec.sectorBreakdown;
-    if (breakdown.isEmpty) return const SizedBox();
-
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('섹터별 비중',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
-              )),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              SizedBox(
-                width: 130,
-                height: 130,
-                child: PieChart(
-                  PieChartData(
-                    sections: breakdown.entries.map((e) {
-                      return PieChartSectionData(
-                        value: e.value,
-                        color: e.key.defaultColor,
-                        radius: 26,
-                        showTitle: false,
-                      );
-                    }).toList(),
-                    centerSpaceRadius: 38,
-                    sectionsSpace: 2,
+            ),
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 16, 24, 120),
+                child: Center(
+                  child: Text(
+                    '· 천천히 익어가는 자산 ·',
+                    style: GoogleFonts.playfairDisplay(
+                      fontSize: 12,
+                      fontStyle: FontStyle.italic,
+                      color: AppColors.textTertiary,
+                      letterSpacing: 0.5,
+                    ),
                   ),
                 ),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: breakdown.entries.map((e) {
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 3),
-                      child: Row(
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Greeting extends StatelessWidget {
+  final PersonaAnimal animal;
+  const _Greeting({required this.animal});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(width: 24, height: 1.5, color: AppColors.wine),
+        const SizedBox(width: 10),
+        Text(
+          'BAEDANG NAMU',
+          style: GoogleFonts.inter(
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            color: AppColors.wine,
+            letterSpacing: 2.5,
+          ),
+        ),
+        const Spacer(),
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(AppRadius.full),
+            border: Border.all(color: AppColors.border, width: 1),
+          ),
+          child: const Icon(
+            Icons.notifications_outlined,
+            size: 16,
+            color: AppColors.wine,
+          ),
+        ),
+      ],
+    ).animate().fadeIn(duration: 280.ms);
+  }
+}
+
+class _AnimalBanner extends StatelessWidget {
+  final PersonaAnimal animal;
+  const _AnimalBanner({required this.animal});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const QuizResultScreen()),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: animal.signatureBg,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+        ),
+        child: Stack(
+          children: [
+            Positioned(
+              right: -10,
+              top: -10,
+              child: Opacity(
+                opacity: 0.15,
+                child: Text(
+                  animal.emoji,
+                  style: const TextStyle(fontSize: 100),
+                ),
+              ),
+            ),
+            Row(
+              children: [
+                Text(animal.emoji, style: const TextStyle(fontSize: 40)),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
                         children: [
                           Container(
-                            width: 10,
-                            height: 10,
-                            decoration: BoxDecoration(
-                              color: e.key.defaultColor,
-                              shape: BoxShape.circle,
+                            width: 14,
+                            height: 1,
+                            color: animal.signatureText.withValues(alpha: 0.5),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            'YOUR SPIRIT',
+                            style: GoogleFonts.inter(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w600,
+                              color: animal.signatureText.withValues(alpha: 0.7),
+                              letterSpacing: 1.5,
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          Text('${e.key.emoji} ${e.key.label}',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: AppColors.textPrimary,
-                              )),
-                          const Spacer(),
-                          Text('${(e.value * 100).round()}%',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: AppColors.textPrimary,
-                              )),
                         ],
                       ),
-                    );
-                  }).toList(),
+                      const SizedBox(height: 4),
+                      Text(
+                        animal.name,
+                        style: GoogleFonts.playfairDisplay(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w700,
+                          color: animal.signatureText,
+                          letterSpacing: -0.5,
+                          height: 1.1,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        animal.tagline,
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          color: animal.signatureText.withValues(alpha: 0.85),
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
+                Icon(
+                  Icons.arrow_forward_rounded,
+                  size: 18,
+                  color: animal.signatureText.withValues(alpha: 0.7),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    ).animate().fadeIn(delay: 150.ms, duration: 400.ms).slideY(begin: 0.05);
+  }
+}
+
+class _MonthlyHero extends StatelessWidget {
+  final dynamic persona;
+  final PortfolioRecommendation rec;
+
+  const _MonthlyHero({required this.persona, required this.rec});
+
+  @override
+  Widget build(BuildContext context) {
+    final monthly = rec.totalMonthlyDividend.round();
+    final target = persona.monthlyTarget;
+    final pct = target > 0
+        ? ((rec.totalMonthlyDividend / target) * 100).round()
+        : 0;
+    final progress = target > 0
+        ? (rec.totalMonthlyDividend / target).clamp(0.0, 1.0)
+        : 0.0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text('·',
+                style: TextStyle(
+                    color: AppColors.wine,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900)),
+            const SizedBox(width: 6),
+            Text(
+              'MONTHLY DIVIDEND',
+              style: GoogleFonts.inter(
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+                color: AppColors.wine,
+                letterSpacing: 2,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text('·',
+                style: TextStyle(
+                    color: AppColors.wine,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900)),
+          ],
+        ).animate().fadeIn(delay: 200.ms, duration: 280.ms),
+        const SizedBox(height: 14),
+        TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0, end: monthly.toDouble()),
+          duration: const Duration(milliseconds: 1100),
+          curve: Curves.easeOutCubic,
+          builder: (context, value, _) {
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Text(
+                  '₩',
+                  style: GoogleFonts.inter(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.wine,
+                    letterSpacing: -1,
+                    height: 1,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  _fmt(value.round()),
+                  style: GoogleFonts.inter(
+                    fontSize: 52,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.wineDeep,
+                    letterSpacing: -2.5,
+                    height: 1,
+                  ),
+                ),
+              ],
+            );
+          },
+        ),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            Expanded(
+              child: Stack(
+                children: [
+                  Container(
+                    height: 2,
+                    decoration: BoxDecoration(
+                      color: AppColors.borderSoft,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0, end: progress),
+                    duration: const Duration(milliseconds: 1100),
+                    curve: Curves.easeOutCubic,
+                    builder: (context, value, _) {
+                      return FractionallySizedBox(
+                        widthFactor: value,
+                        child: Container(
+                          height: 2,
+                          decoration: BoxDecoration(
+                            color: AppColors.wine,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 14),
+            Text(
+              '$pct%',
+              style: GoogleFonts.inter(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: pct >= 100 ? AppColors.gold : AppColors.wine,
+                letterSpacing: -0.2,
+              ),
+            ),
+          ],
+        ).animate().fadeIn(delay: 600.ms, duration: 320.ms),
+        const SizedBox(height: 8),
+        Text(
+          '목표 ₩${_fmt(target)}',
+          style: GoogleFonts.inter(
+            fontSize: 12,
+            color: AppColors.textTertiary,
+            fontStyle: FontStyle.italic,
+          ),
+        ).animate().fadeIn(delay: 700.ms),
+      ],
+    );
+  }
+
+  String _fmt(int v) {
+    final s = v.toString();
+    final buf = StringBuffer();
+    for (int i = 0; i < s.length; i++) {
+      if (i > 0 && (s.length - i) % 3 == 0) buf.write(',');
+      buf.write(s[i]);
+    }
+    return buf.toString();
+  }
+}
+
+class _WineCard extends StatelessWidget {
+  final PortfolioRecommendation rec;
+  final PersonaAnimal animal;
+  const _WineCard({required this.rec, required this.animal});
+
+  @override
+  Widget build(BuildContext context) {
+    final picks = rec.picks.take(5).toList();
+    final coverage = rec.coverageCount;
+
+    return Container(
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.wine, AppColors.wineDeep],
+        ),
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.wine.withValues(alpha: 0.15),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            right: -20,
+            top: -20,
+            child: Opacity(
+              opacity: 0.06,
+              child: Text(
+                '※',
+                style: GoogleFonts.playfairDisplay(
+                  fontSize: 130,
+                  color: AppColors.surface,
+                  fontWeight: FontWeight.w400,
+                ),
+              ),
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 16,
+                    height: 1,
+                    color: AppColors.surface.withValues(alpha: 0.5),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    'YOUR PICKS',
+                    style: GoogleFonts.inter(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.surface.withValues(alpha: 0.8),
+                      letterSpacing: 2,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Text(
+                coverage == 12
+                    ? '매달 들어오는\n배당'
+                    : '$coverage개월 배당이\n흘러들어옵니다',
+                style: GoogleFonts.playfairDisplay(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.surface,
+                  letterSpacing: -0.5,
+                  height: 1.25,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: [
+                  SizedBox(
+                    width: picks.length * 28.0 + 14,
+                    height: 38,
+                    child: Stack(
+                      children: List.generate(picks.length, (i) {
+                        return Positioned(
+                          left: i * 24.0,
+                          child: Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: AppColors.surface,
+                              borderRadius:
+                              BorderRadius.circular(AppRadius.full),
+                              border: Border.all(
+                                  color: AppColors.wineDeep, width: 2),
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              picks[i].stock.sector.emoji,
+                              style: const TextStyle(fontSize: 16),
+                            ),
+                          ),
+                        );
+                      }),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(AppRadius.full),
+                      border: Border.all(
+                          color: AppColors.surface.withValues(alpha: 0.3)),
+                    ),
+                    child: Text(
+                      '${rec.picks.length}',
+                      style: GoogleFonts.inter(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.surface,
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  Icon(
+                    Icons.arrow_forward_rounded,
+                    size: 18,
+                    color: AppColors.surface.withValues(alpha: 0.7),
+                  ),
+                ],
               ),
             ],
           ),
@@ -300,165 +534,143 @@ class _SectorDonut extends StatelessWidget {
   }
 }
 
-// ─── 추천 이유 ────────────────────────────────────
-class _RationaleCard extends StatelessWidget {
-  final List<String> reasons;
-  const _RationaleCard({required this.reasons});
+class _PortfolioHeader extends StatelessWidget {
+  final int count;
+  const _PortfolioHeader({required this.count});
 
   @override
   Widget build(BuildContext context) {
-    if (reasons.isEmpty) return const SizedBox();
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: AppColors.bgCard,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: const [
-              Icon(Icons.auto_awesome_rounded,
-                  color: AppColors.accent, size: 18),
-              SizedBox(width: 6),
-              Text('이렇게 추천한 이유',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
-                  )),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Text(
+          'Portfolio',
+          style: GoogleFonts.playfairDisplay(
+            fontSize: 22,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
+            letterSpacing: -0.4,
+          ),
+        ),
+        const SizedBox(width: 10),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 4),
+          child: Text(
+            '$count',
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textTertiary,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+        ),
+        const Spacer(),
+        Padding(
+          padding: const EdgeInsets.only(bottom: 4),
+          child: Row(
+            children: [
+              Text(
+                '비중순',
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  color: AppColors.textTertiary,
+                  fontStyle: FontStyle.italic,
+                ),
+              ),
+              const SizedBox(width: 4),
+              Icon(Icons.arrow_drop_down_rounded,
+                  size: 14, color: AppColors.textTertiary),
             ],
           ),
-          const SizedBox(height: 12),
-          ...reasons.map((r) => Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Padding(
-                  padding: EdgeInsets.only(top: 6),
-                  child: Icon(Icons.circle,
-                      color: AppColors.accent, size: 5),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(r,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: AppColors.textPrimary,
-                        height: 1.5,
-                      )),
-                ),
-              ],
-            ),
-          )),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
 
-// ─── 종목 카드 ────────────────────────────────────
-class _PickCard extends StatelessWidget {
+class _PickRow extends StatelessWidget {
   final PortfolioPick pick;
-  const _PickCard({required this.pick});
+  final bool isLast;
+  const _PickRow({required this.pick, required this.isLast});
 
   @override
   Widget build(BuildContext context) {
     final stock = pick.stock;
-    final weightPct = (pick.weightOfTotal * 100).round();
+    final monthly = pick.monthlyDividend.round();
+    final pct = (pick.weightOfTotal * 100).round();
 
     return GestureDetector(
       onTap: () => Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => StockDetailScreen(stock: stock)),
       ),
+      behavior: HitTestBehavior.opaque,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
-          color: AppColors.bgCard,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.border),
+          border: isLast
+              ? null
+              : const Border(
+            bottom: BorderSide(color: AppColors.borderSoft, width: 1),
+          ),
         ),
-        child: Column(
+        child: Row(
           children: [
-            Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: stock.sectorColor.withValues(alpha: 0.18),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(stock.sector.emoji,
-                      style: const TextStyle(fontSize: 22)),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(stock.name,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
-                          )),
-                      const SizedBox(height: 2),
-                      Text('${pick.shares}주 매수 · ${stock.frequency.label}',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: AppColors.textSecondary,
-                          )),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.18),
-                    borderRadius: BorderRadius.circular(99),
-                  ),
-                  child: Text('$weightPct%',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.primary,
-                      )),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            // 비중 바
-            ClipRRect(
-              borderRadius: BorderRadius.circular(99),
-              child: LinearProgressIndicator(
-                value: pick.weightOfTotal,
-                minHeight: 4,
-                backgroundColor: AppColors.border,
-                valueColor: AlwaysStoppedAnimation(stock.sectorColor),
+            SizedBox(
+              width: 28,
+              child: Text(
+                stock.sector.emoji,
+                style: const TextStyle(fontSize: 20),
               ),
             ),
-            const SizedBox(height: 12),
-            Row(
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    stock.name,
+                    style: GoogleFonts.inter(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                      letterSpacing: -0.2,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${pick.shares}주 · ${stock.frequency.label} · ${stock.dividendYield.toStringAsFixed(1)}%',
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      color: AppColors.textTertiary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                _PickStat(
-                    label: '매수금', value: formatKRW(pick.cost.round())),
-                const SizedBox(width: 16),
-                _PickStat(
-                    label: '월 배당',
-                    value: formatKRW(pick.monthlyDividend.round())),
-                const Spacer(),
-                _PickStat(
-                    label: '수익률',
-                    value: formatPct(stock.dividendYield),
-                    highlight: true),
+                Text(
+                  '+₩${_fmt(monthly)}',
+                  style: GoogleFonts.inter(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.wine,
+                    letterSpacing: -0.2,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '$pct%',
+                  style: GoogleFonts.inter(
+                    fontSize: 11,
+                    color: AppColors.textTertiary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
               ],
             ),
           ],
@@ -466,33 +678,14 @@ class _PickCard extends StatelessWidget {
       ),
     );
   }
-}
 
-class _PickStat extends StatelessWidget {
-  final String label;
-  final String value;
-  final bool highlight;
-  const _PickStat(
-      {required this.label, required this.value, this.highlight = false});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label,
-            style: const TextStyle(
-              fontSize: 10,
-              color: AppColors.textSecondary,
-            )),
-        const SizedBox(height: 2),
-        Text(value,
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-              color: highlight ? AppColors.primary : AppColors.textPrimary,
-            )),
-      ],
-    );
+  String _fmt(int v) {
+    final s = v.toString();
+    final buf = StringBuffer();
+    for (int i = 0; i < s.length; i++) {
+      if (i > 0 && (s.length - i) % 3 == 0) buf.write(',');
+      buf.write(s[i]);
+    }
+    return buf.toString();
   }
 }

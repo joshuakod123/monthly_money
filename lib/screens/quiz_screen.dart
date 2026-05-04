@@ -6,12 +6,13 @@ import '../algorithms/persona_profile.dart';
 import '../providers/app_providers.dart';
 import '../theme/app_theme.dart';
 import '../widgets/common_widgets.dart';
+import 'quiz_result_screen.dart';
 
 /// ═══════════════════════════════════════════════════════════
-///  QuizScreen v4
-///   - 9번째 질문: 타이핑 + 슬라이더 hybrid
-///   - 더 깔끔한 시각 위계
-///   - 진행률바 상단 고정
+///  QuizScreen — Linear/Vercel 톤
+///   - 다크 테마 정착 (흰 배경 카드 제거)
+///   - 보더 기반 선택 표시
+///   - 절제된 액센트 사용
 /// ═══════════════════════════════════════════════════════════
 class QuizScreen extends ConsumerStatefulWidget {
   const QuizScreen({super.key});
@@ -48,7 +49,7 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
   }
 
   void _goNext() {
-    Future.delayed(const Duration(milliseconds: 220), () {
+    Future.delayed(const Duration(milliseconds: 200), () {
       if (_currentIndex < _totalSteps - 1) {
         _pageController.nextPage(
           duration: const Duration(milliseconds: 320),
@@ -76,9 +77,15 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
       budget: _budget,
       preferredSectors: _preferredSectors,
     );
-    // 새 메서드: setProfile (디스크 저장까지)
     await ref.read(personaProfileProvider.notifier).setProfile(profile);
-    if (mounted) Navigator.pop(context);
+
+    if (!mounted) return;
+
+    // 기존 Navigator.pop 대신 → 영수증 결과 화면으로 push
+    // pushReplacement 쓰면 뒤로가기 시 퀴즈로 안 돌아감 (의도)
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const QuizResultScreen()),
+    );
   }
 
   @override
@@ -86,37 +93,35 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
     final progress = (_currentIndex + 1) / _totalSteps;
 
     return Scaffold(
-      backgroundColor: AppColors.bgPage,
+      backgroundColor: AppColors.bg,
       appBar: AppBar(
-        backgroundColor: AppColors.bgPage,
+        backgroundColor: AppColors.bg,
         foregroundColor: AppColors.textPrimary,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
-          onPressed: _currentIndex == 0
-              ? () => Navigator.pop(context)
-              : _goPrev,
+          icon: const Icon(Icons.arrow_back_rounded, size: 20),
+          onPressed: _currentIndex == 0 ? () => Navigator.pop(context) : _goPrev,
         ),
         title: Text(
           '${_currentIndex + 1} / $_totalSteps',
           style: const TextStyle(
             fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: AppColors.textSecondary,
-            letterSpacing: 1,
+            fontWeight: FontWeight.w500,
+            color: AppColors.textTertiary,
+            letterSpacing: 0.5,
           ),
         ),
         centerTitle: true,
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(3),
+          preferredSize: const Size.fromHeight(2),
           child: Stack(
             children: [
-              Container(height: 3, color: AppColors.border),
+              Container(height: 2, color: AppColors.border),
               AnimatedFractionallySizedBox(
                 duration: const Duration(milliseconds: 320),
                 curve: Curves.easeOutCubic,
                 widthFactor: progress,
-                child: Container(height: 3, color: AppColors.accent),
+                child: Container(height: 2, color: AppColors.accent),
               ),
             ],
           ),
@@ -149,6 +154,9 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
   }
 }
 
+// ═══════════════════════════════════════════════════════════
+//  질문 페이지
+// ═══════════════════════════════════════════════════════════
 class _QuestionPage extends StatelessWidget {
   final QuizQuestion question;
   final List<int> selected;
@@ -165,39 +173,41 @@ class _QuestionPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+      padding: const EdgeInsets.fromLTRB(24, 32, 24, 32),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: 8),
+          // 질문
           Text(
             question.question,
             style: const TextStyle(
-              fontSize: 23,
-              fontWeight: FontWeight.w700,
+              fontSize: 22,
+              fontWeight: FontWeight.w600,
               color: AppColors.textPrimary,
               letterSpacing: -0.5,
               height: 1.35,
             ),
-          ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.1, end: 0),
+          ).animate().fadeIn(duration: 280.ms).slideY(begin: 0.05),
           if (question.subtitle != null) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             Text(
               question.subtitle!,
               style: const TextStyle(
                 fontSize: 13,
-                color: AppColors.textSecondary,
+                color: AppColors.textTertiary,
                 height: 1.5,
               ),
-            ).animate().fadeIn(delay: 100.ms, duration: 300.ms),
+            ).animate().fadeIn(delay: 80.ms, duration: 280.ms),
           ],
           const SizedBox(height: 32),
+
+          // 옵션들
           ...question.options.asMap().entries.map((entry) {
             final idx = entry.key;
             final opt = entry.value;
             final isSelected = selected.contains(idx);
             return Padding(
-              padding: const EdgeInsets.only(bottom: 10),
+              padding: const EdgeInsets.only(bottom: 8),
               child: _OptionTile(
                 option: opt,
                 isSelected: isSelected,
@@ -205,33 +215,19 @@ class _QuestionPage extends StatelessWidget {
               )
                   .animate()
                   .fadeIn(
-                delay: Duration(milliseconds: 100 + idx * 60),
-                duration: 320.ms,
+                delay: Duration(milliseconds: 80 + idx * 40),
+                duration: 280.ms,
               )
-                  .slideY(begin: 0.15, end: 0),
+                  .slideY(begin: 0.08),
             );
           }),
+
+          // multi-choice일 때만 다음 버튼
           if (onContinue != null && selected.isNotEmpty) ...[
             const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: onContinue,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: AppColors.accent,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  elevation: 0,
-                ),
-                child: const Text(
-                  '다음',
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-                ),
-              ),
-            ).animate().fadeIn(duration: 200.ms),
+            _ContinueButton(onPressed: onContinue!)
+                .animate()
+                .fadeIn(duration: 200.ms),
           ],
         ],
       ),
@@ -239,82 +235,96 @@ class _QuestionPage extends StatelessWidget {
   }
 }
 
+// ═══════════════════════════════════════════════════════════
+//  옵션 타일 — Linear 톤 (다크, 보더 기반 선택)
+// ═══════════════════════════════════════════════════════════
 class _OptionTile extends StatelessWidget {
   final QuizOption option;
   final bool isSelected;
   final VoidCallback onTap;
-  const _OptionTile(
-      {required this.option, required this.isSelected, required this.onTap});
+
+  const _OptionTile({
+    required this.option,
+    required this.isSelected,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
+      behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        curve: Curves.easeOut,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.primary : Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          color: isSelected ? AppColors.accentGhost : AppColors.bgElevated,
+          borderRadius: BorderRadius.circular(AppRadius.md),
           border: Border.all(
-            color: isSelected ? AppColors.primary : AppColors.border,
-            width: 1.2,
+            color: isSelected ? AppColors.accent : AppColors.border,
+            width: 1,
           ),
-          boxShadow: isSelected
-              ? [
-            BoxShadow(
-              color: AppColors.primary.withOpacity(0.18),
-              blurRadius: 14,
-              offset: const Offset(0, 5),
-            )
-          ]
-              : null,
         ),
         child: Row(
           children: [
+            // 이모지 컨테이너
             Container(
-              width: 42,
-              height: 42,
+              width: 38,
+              height: 38,
               decoration: BoxDecoration(
-                color: isSelected
-                    ? AppColors.accent.withOpacity(0.18)
-                    : AppColors.bgPage,
-                borderRadius: BorderRadius.circular(12),
+                color: AppColors.bg,
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+                border: Border.all(
+                  color: isSelected
+                      ? AppColors.accent.withValues(alpha: 0.3)
+                      : AppColors.border,
+                  width: 1,
+                ),
               ),
               alignment: Alignment.center,
-              child: Text(option.emoji, style: const TextStyle(fontSize: 22)),
+              child: Text(option.emoji, style: const TextStyle(fontSize: 18)),
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: 12),
+            // 라벨 + 설명
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     option.label,
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: isSelected ? AppColors.accent : AppColors.textPrimary,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                      letterSpacing: -0.2,
                     ),
                   ),
                   if (option.description != null) ...[
                     const SizedBox(height: 2),
                     Text(
                       option.description!,
-                      style: TextStyle(
+                      style: const TextStyle(
                         fontSize: 12,
-                        color: isSelected
-                            ? Colors.white.withOpacity(0.65)
-                            : AppColors.textSecondary,
+                        color: AppColors.textTertiary,
+                        height: 1.4,
                       ),
                     ),
                   ],
                 ],
               ),
             ),
+            // 선택 표시 — 작은 점만
             if (isSelected)
-              const Icon(Icons.check_circle_rounded,
-                  color: AppColors.accent, size: 22),
+              Container(
+                width: 16,
+                height: 16,
+                decoration: const BoxDecoration(
+                  color: AppColors.accent,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.check, size: 11, color: AppColors.bg),
+              ),
           ],
         ),
       ),
@@ -322,9 +332,60 @@ class _OptionTile extends StatelessWidget {
   }
 }
 
-/// ─────────────────────────────────────────
-/// 9번째: 목표 + 예산 (타이핑 입력 hybrid)
-/// ─────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════
+//  공통 다음/완료 버튼
+// ═══════════════════════════════════════════════════════════
+class _ContinueButton extends StatelessWidget {
+  final VoidCallback onPressed;
+  final String label;
+  final IconData? icon;
+
+  const _ContinueButton({
+    required this.onPressed,
+    this.label = '다음',
+    this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      child: ElevatedButton(
+        onPressed: onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.textPrimary,
+          foregroundColor: AppColors.bg,
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.md),
+          ),
+          elevation: 0,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 16),
+              const SizedBox(width: 8),
+            ],
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                letterSpacing: -0.2,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+//  마지막 페이지 — 목표 + 예산
+// ═══════════════════════════════════════════════════════════
 class _GoalPage extends StatefulWidget {
   final int monthlyTarget;
   final int budget;
@@ -362,9 +423,11 @@ class _GoalPageState extends State<_GoalPage> {
 
     _targetFocus.addListener(() {
       if (!_targetFocus.hasFocus) _commitTarget();
+      setState(() {});
     });
     _budgetFocus.addListener(() {
       if (!_budgetFocus.hasFocus) _commitBudget();
+      setState(() {});
     });
   }
 
@@ -420,39 +483,36 @@ class _GoalPageState extends State<_GoalPage> {
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+        padding: const EdgeInsets.fromLTRB(24, 32, 24, 32),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const SizedBox(height: 8),
             const Text(
               '마지막으로,\n목표와 예산을 알려주세요',
               style: TextStyle(
-                fontSize: 23,
-                fontWeight: FontWeight.w700,
+                fontSize: 22,
+                fontWeight: FontWeight.w600,
                 color: AppColors.textPrimary,
                 letterSpacing: -0.5,
                 height: 1.35,
               ),
-            ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.1, end: 0),
+            ).animate().fadeIn(duration: 280.ms).slideY(begin: 0.05),
             const SizedBox(height: 8),
             const Text(
-              '직접 입력하거나 슬라이더로 조절할 수 있어요',
+              '직접 입력하거나 슬라이더로 조절',
               style: TextStyle(
                 fontSize: 13,
-                color: AppColors.textSecondary,
+                color: AppColors.textTertiary,
                 height: 1.5,
               ),
-            ).animate().fadeIn(delay: 100.ms),
+            ).animate().fadeIn(delay: 80.ms),
             const SizedBox(height: 32),
 
-            // ── 월 배당 목표 ─────
-            _AmountInputCard(
+            _AmountInput(
               label: '월 배당 목표',
-              suffix: '원',
               controller: _targetCtrl,
               focusNode: _targetFocus,
-              secondary: '연 ${formatKRW(widget.monthlyTarget * 12)}',
+              hint: '연 ${formatKRW(widget.monthlyTarget * 12)}',
               onCommit: _commitTarget,
               onTextChanged: (text) {
                 final v = _parse(text);
@@ -470,15 +530,13 @@ class _GoalPageState extends State<_GoalPage> {
                 _targetCtrl.text = _formatPlain(v);
               },
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
 
-            // ── 예산 ─────
-            _AmountInputCard(
-              label: '투자 가능 예산',
-              suffix: '원',
+            _AmountInput(
+              label: '투자 예산',
               controller: _budgetCtrl,
               focusNode: _budgetFocus,
-              secondary: '한 번에 투자 가능한 총액',
+              hint: '한 번에 투자 가능한 총액',
               onCommit: _commitBudget,
               onTextChanged: (text) {
                 final v = _parse(text);
@@ -498,18 +556,28 @@ class _GoalPageState extends State<_GoalPage> {
             ),
             const SizedBox(height: 28),
 
-            // ── 선호 섹터 ─────
-            const Text('선호 섹터 (선택사항)',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+            // ── 선호 섹터
+            const Text(
+              '선호 섹터',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+                letterSpacing: -0.2,
+              ),
+            ),
             const SizedBox(height: 4),
             const Text(
-              '비워두셔도 됩니다 — 알고리즘이 자동 분산해드려요',
-              style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+              '선택사항 — 비워두면 자동 분산',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.textTertiary,
+              ),
             ),
             const SizedBox(height: 12),
             Wrap(
-              spacing: 8,
-              runSpacing: 8,
+              spacing: 6,
+              runSpacing: 6,
               children: const [
                 _SectorOption(id: 'finance', label: '금융', emoji: '🏦'),
                 _SectorOption(id: 'telecom', label: '통신', emoji: '📡'),
@@ -519,7 +587,9 @@ class _GoalPageState extends State<_GoalPage> {
                 _SectorOption(id: 'industrial', label: '산업재', emoji: '🏭'),
               ].map((opt) {
                 final selected = widget.preferredSectors.contains(opt.id);
-                return GestureDetector(
+                return _SectorChip(
+                  option: opt,
+                  isSelected: selected,
                   onTap: () {
                     final next = [...widget.preferredSectors];
                     if (selected) {
@@ -529,67 +599,16 @@ class _GoalPageState extends State<_GoalPage> {
                     }
                     widget.onSectorsChanged(next);
                   },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: selected ? AppColors.primary : Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: selected ? AppColors.primary : AppColors.border,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(opt.emoji, style: const TextStyle(fontSize: 16)),
-                        const SizedBox(width: 6),
-                        Text(
-                          opt.label,
-                          style: TextStyle(
-                            color: selected
-                                ? AppColors.accent
-                                : AppColors.textPrimary,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
                 );
               }).toList(),
             ),
 
-            const SizedBox(height: 40),
+            const SizedBox(height: 36),
 
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: widget.onFinish,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: AppColors.accent,
-                  padding: const EdgeInsets.symmetric(vertical: 18),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  elevation: 0,
-                ),
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.auto_awesome_rounded, size: 18),
-                    SizedBox(width: 8),
-                    Text(
-                      '내 맞춤 포트폴리오 보기',
-                      style:
-                      TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
-                    ),
-                  ],
-                ),
-              ),
+            _ContinueButton(
+              onPressed: widget.onFinish,
+              label: '내 포트폴리오 보기',
+              icon: Icons.arrow_forward_rounded,
             ),
           ],
         ),
@@ -598,10 +617,9 @@ class _GoalPageState extends State<_GoalPage> {
   }
 }
 
-class _AmountInputCard extends StatelessWidget {
+class _AmountInput extends StatelessWidget {
   final String label;
-  final String suffix;
-  final String secondary;
+  final String hint;
   final TextEditingController controller;
   final FocusNode focusNode;
   final VoidCallback onCommit;
@@ -615,10 +633,9 @@ class _AmountInputCard extends StatelessWidget {
   final int current;
   final ValueChanged<int> onPick;
 
-  const _AmountInputCard({
+  const _AmountInput({
     required this.label,
-    required this.suffix,
-    required this.secondary,
+    required this.hint,
     required this.controller,
     required this.focusNode,
     required this.onCommit,
@@ -635,101 +652,96 @@ class _AmountInputCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isFocused = focusNode.hasFocus;
+
     return Container(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.primary,
-        borderRadius: BorderRadius.circular(20),
+        color: AppColors.bgElevated,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(
+          color: isFocused ? AppColors.accent : AppColors.border,
+          width: 1,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.6),
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.5,
-            ),
-          ),
-          const SizedBox(height: 10),
-          // ── 타이핑 입력 영역 ──
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: focusNode.hasFocus
-                    ? AppColors.accent.withOpacity(0.6)
-                    : Colors.white.withOpacity(0.12),
-                width: 1.2,
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.textTertiary,
+                  letterSpacing: 0.3,
+                ),
               ),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: controller,
-                    focusNode: focusNode,
-                    keyboardType: TextInputType.number,
-                    textAlign: TextAlign.end,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 26,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.8,
-                    ),
-                    cursorColor: AppColors.accent,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                      _ThousandsFormatter(),
-                    ],
-                    decoration: const InputDecoration(
-                      isDense: true,
-                      contentPadding: EdgeInsets.zero,
-                      border: InputBorder.none,
-                      hintText: '0',
-                      hintStyle: TextStyle(color: Colors.white24),
-                    ),
-                    onChanged: onTextChanged,
-                    onSubmitted: (_) => onCommit(),
+              Text(
+                hint,
+                style: const TextStyle(
+                  fontSize: 11,
+                  color: AppColors.textDisabled,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: controller,
+                  focusNode: focusNode,
+                  keyboardType: TextInputType.number,
+                  style: const TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 28,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: -0.8,
+                  ),
+                  cursorColor: AppColors.accent,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    _ThousandsFormatter(),
+                  ],
+                  decoration: const InputDecoration(
+                    isDense: true,
+                    contentPadding: EdgeInsets.zero,
+                    border: InputBorder.none,
+                    hintText: '0',
+                    hintStyle: TextStyle(color: AppColors.textDisabled),
+                  ),
+                  onChanged: onTextChanged,
+                  onSubmitted: (_) => onCommit(),
+                ),
+              ),
+              const SizedBox(width: 4),
+              const Padding(
+                padding: EdgeInsets.only(bottom: 5),
+                child: Text(
+                  '원',
+                  style: TextStyle(
+                    color: AppColors.textTertiary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
-                const SizedBox(width: 6),
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 5),
-                  child: Text(
-                    suffix,
-                    style: const TextStyle(
-                      color: AppColors.accent,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
-          const SizedBox(height: 6),
-          Text(
-            secondary,
-            style: const TextStyle(
-              color: AppColors.accent,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          // ── 슬라이더 ──
+          const SizedBox(height: 8),
           SliderTheme(
             data: SliderTheme.of(context).copyWith(
               activeTrackColor: AppColors.accent,
-              inactiveTrackColor: Colors.white.withOpacity(0.12),
-              thumbColor: AppColors.accent,
-              overlayColor: AppColors.accent.withOpacity(0.2),
-              trackHeight: 3,
+              inactiveTrackColor: AppColors.border,
+              thumbColor: AppColors.textPrimary,
+              overlayColor: AppColors.accent.withValues(alpha: 0.15),
+              trackHeight: 2,
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
             ),
             child: Slider(
               value: sliderValue.clamp(sliderMin, sliderMax),
@@ -739,30 +751,31 @@ class _AmountInputCard extends StatelessWidget {
               onChanged: onSliderChanged,
             ),
           ),
-          // ── 빠른 선택 칩 ──
+          const SizedBox(height: 4),
           Wrap(
             spacing: 6,
             runSpacing: 6,
             children: quick.map((v) {
-              final selected = current == v;
+              final isSel = current == v;
               return GestureDetector(
                 onTap: () => onPick(v),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 150),
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 11, vertical: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
-                    color: selected
-                        ? AppColors.accent
-                        : Colors.white.withOpacity(0.08),
-                    borderRadius: BorderRadius.circular(99),
+                    color: isSel ? AppColors.accentGhost : Colors.transparent,
+                    borderRadius: BorderRadius.circular(AppRadius.full),
+                    border: Border.all(
+                      color: isSel ? AppColors.accent : AppColors.border,
+                      width: 1,
+                    ),
                   ),
                   child: Text(
                     formatKRW(v),
                     style: TextStyle(
                       fontSize: 11,
-                      color: selected ? AppColors.primary : Colors.white70,
-                      fontWeight: FontWeight.w700,
+                      color: isSel ? AppColors.accent : AppColors.textSecondary,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
@@ -770,6 +783,52 @@ class _AmountInputCard extends StatelessWidget {
             }).toList(),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _SectorChip extends StatelessWidget {
+  final _SectorOption option;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _SectorChip({
+    required this.option,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.accentGhost : AppColors.bgElevated,
+          borderRadius: BorderRadius.circular(AppRadius.full),
+          border: Border.all(
+            color: isSelected ? AppColors.accent : AppColors.border,
+            width: 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(option.emoji, style: const TextStyle(fontSize: 14)),
+            const SizedBox(width: 6),
+            Text(
+              option.label,
+              style: TextStyle(
+                color: isSelected ? AppColors.accent : AppColors.textPrimary,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -799,6 +858,9 @@ class _SectorOption {
   final String id;
   final String label;
   final String emoji;
-  const _SectorOption(
-      {required this.id, required this.label, required this.emoji});
+  const _SectorOption({
+    required this.id,
+    required this.label,
+    required this.emoji,
+  });
 }

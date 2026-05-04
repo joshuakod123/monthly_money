@@ -384,6 +384,15 @@ class RecommendationEngine {
   ///   - 한 종목당 최소 1주는 사도록 보장
   ///   - "예산 부족해서 목표 미달"인 경우도 정직하게 표시
   /// ═════════════════════════════════════════════════════
+  /// ═════════════════════════════════════════════════════
+  ///  공통: 예산 기반 비중 분배 v2
+  ///
+  ///  핵심 개선:
+  ///   1. 목표 비중을 점수 기반으로 미리 계산 (한 종목 30% 상한)
+  ///   2. 각 종목에 (예산 × 목표 비중)만큼만 할당
+  ///   3. 한 종목이 예산을 독식하지 못하게 방지
+  ///   4. 잔여 예산은 비중 큰 순으로 균등 분배
+  /// ═════════════════════════════════════════════════════
   static PortfolioRecommendation _allocateWeights(
       PersonaProfile persona,
       List<_ScoredStock> selected,
@@ -392,27 +401,43 @@ class RecommendationEngine {
     if (selected.isEmpty) return PortfolioRecommendation.empty(persona);
 
     final budget = persona.budget;
-    final totalScore = selected.fold<double>(0, (a, b) => a + b.score);
 
-    // ── 1단계: 점수 비례로 예산 분배 + 살 수 있는 주식 수 계산
+    // ── 1단계: 목표 비중 계산 (점수 기반, 상한 30%)
+    // 한 종목이 예산의 30% 이상 차지하지 못하게
+    const maxWeight = 0.30;
+    const minWeight = 0.05;
+
+    // 점수를 비중으로 변환 (소프트맥스 비슷한 효과)
+    final rawWeights = selected.map((s) => s.score).toList();
+    final totalScore = rawWeights.fold<double>(0, (a, b) => a + b);
+
+    List<double> targetWeights;
+    if (totalScore > 0) {
+      targetWeights = rawWeights.map((w) => w / totalScore).toList();
+    } else {
+      // 점수 다 0이면 균등 분배
+      targetWeights = List.filled(selected.length, 1.0 / selected.length);
+    }
+
+    // 상한/하한 적용 후 재정규화
+    targetWeights = _normalizeWeights(targetWeights, minWeight, maxWeight);
+
+    // ── 2단계: 각 종목에 (예산 × 목표 비중) 할당해서 살 수 있는 주식 수 계산
     final preliminary = <_PreliminaryPick>[];
-    int totalSpent = 0;
 
-    for (final ss in selected) {
+    for (var i = 0; i < selected.length; i++) {
+      final ss = selected[i];
       final stock = ss.stock;
-      if (stock.price <= 0) continue; // 가격 0이면 스킵
+      if (stock.price <= 0) continue;
 
-      // 이 종목에 할당할 예산 비중
-      final allocRatio = totalScore > 0 ? ss.score / totalScore : 1.0 / selected.length;
-      final allocBudget = budget * allocRatio;
+      final targetBudget = budget * targetWeights[i];
+      int shares = (targetBudget / stock.price).floor();
 
-      // 그 예산으로 살 수 있는 주식 수 (최소 1주는 보장)
-      int shares = (allocBudget / stock.price).floor();
-      if (shares < 1 && allocBudget >= stock.price * 0.3) {
-        // 예산 비중은 부족하지만 한 주 가격에 가까우면 1주 사도록
+      // 비중 작아도 최소 1주는 사고 싶음 (단, 한 주가 전체 예산의 50%를 넘지 않을 때만)
+      if (shares < 1 && stock.price <= budget * 0.5) {
         shares = 1;
       }
-      if (shares < 1) continue; // 그래도 못 사면 스킵
+      if (shares < 1) continue;
 
       final cost = shares * stock.price;
       preliminary.add(_PreliminaryPick(
@@ -422,34 +447,63 @@ class RecommendationEngine {
         cost: cost,
         monthlyDividend: stock.monthlyDividend(shares),
       ));
-      totalSpent += cost.round();
     }
 
-    // ── 2단계: 예산 잔여분으로 추가 매수 (점수 높은 종목부터)
+    // ── 3단계: 잔여 예산으로 추가 매수 (비중 미달 종목 우선)
+    int totalSpent = preliminary.fold(0, (a, p) => a + p.cost.round());
     int remaining = budget - totalSpent;
-    preliminary.sort((a, b) => b.score.compareTo(a.score));
-    bool changed = true;
-    while (changed && remaining > 0) {
-      changed = false;
+
+    // 안전장치: 무한 루프 방지 (최대 1000회 반복)
+    int iter = 0;
+    while (remaining > 0 && iter < 1000) {
+      iter++;
+
+      // 현재 비중과 목표 비중의 차이가 가장 큰 종목 찾기
+      final actualTotal = preliminary.fold<double>(0, (a, p) => a + p.cost);
+      if (actualTotal == 0) break;
+
+      int? bestIdx;
+      double biggestUnderweight = 0;
+
       for (var i = 0; i < preliminary.length; i++) {
         final p = preliminary[i];
-        if (p.stock.price <= remaining) {
-          final newShares = p.shares + 1;
-          final newCost = newShares * p.stock.price;
-          preliminary[i] = _PreliminaryPick(
-            stock: p.stock,
-            shares: newShares,
-            score: p.score,
-            cost: newCost,
-            monthlyDividend: p.stock.monthlyDividend(newShares),
-          );
-          remaining -= p.stock.price.round();
-          changed = true;
+        if (p.stock.price > remaining) continue;
+
+        // 이 종목의 현재 비중 vs 목표 비중
+        // selected와 preliminary가 같은 인덱스라는 보장이 없으니 score로 매칭
+        final selectedIdx = selected.indexWhere(
+              (s) => s.stock.code == p.stock.code,
+        );
+        if (selectedIdx < 0) continue;
+
+        final targetW = targetWeights[selectedIdx];
+        final actualW = p.cost / actualTotal;
+        final underweight = targetW - actualW;
+
+        if (underweight > biggestUnderweight) {
+          biggestUnderweight = underweight;
+          bestIdx = i;
         }
       }
+
+      // 더 살 종목이 없거나, 모두 목표 비중 도달 → 종료
+      if (bestIdx == null || biggestUnderweight < 0.01) break;
+
+      // 1주 추가
+      final p = preliminary[bestIdx];
+      final newShares = p.shares + 1;
+      final newCost = newShares * p.stock.price;
+      preliminary[bestIdx] = _PreliminaryPick(
+        stock: p.stock,
+        shares: newShares,
+        score: p.score,
+        cost: newCost,
+        monthlyDividend: p.stock.monthlyDividend(newShares),
+      );
+      remaining -= p.stock.price.round();
     }
 
-    // ── 3단계: 비중% 계산
+    // ── 4단계: 최종 비중% 계산
     final actualTotal = preliminary.fold<double>(0, (a, p) => a + p.cost);
     final picks = <PortfolioPick>[];
     for (final p in preliminary) {
@@ -471,6 +525,55 @@ class RecommendationEngine {
       diversityScore: 1.0 - _calculateHHI(picks),
       coveredMonths: coveredMonths,
     );
+  }
+
+  /// 비중 정규화: 상한/하한 적용 후 합이 1이 되도록
+  static List<double> _normalizeWeights(
+      List<double> weights, double min, double max,
+      ) {
+    if (weights.isEmpty) return weights;
+
+    var result = [...weights];
+
+    // 1) 상한 적용
+    for (var i = 0; i < result.length; i++) {
+      if (result[i] > max) result[i] = max;
+    }
+
+    // 2) 합이 1 미만이면 부족분을 비중 작은 종목에 분배
+    var sum = result.reduce((a, b) => a + b);
+    if (sum < 1.0) {
+      final shortfall = 1.0 - sum;
+      final eligible = <int>[];
+      for (var i = 0; i < result.length; i++) {
+        if (result[i] < max) eligible.add(i);
+      }
+      if (eligible.isNotEmpty) {
+        final addPerStock = shortfall / eligible.length;
+        for (final i in eligible) {
+          result[i] = (result[i] + addPerStock).clamp(0.0, max);
+        }
+      }
+    }
+
+    // 3) 합이 1 초과면 비례 축소
+    sum = result.reduce((a, b) => a + b);
+    if (sum > 1.0) {
+      result = result.map((w) => w / sum).toList();
+    }
+
+    // 4) 하한 적용 (작은 비중도 의미 있게)
+    for (var i = 0; i < result.length; i++) {
+      if (result[i] < min) result[i] = min;
+    }
+
+    // 5) 다시 정규화
+    sum = result.reduce((a, b) => a + b);
+    if (sum > 0) {
+      result = result.map((w) => w / sum).toList();
+    }
+
+    return result;
   }
 
   static double _calculateHHI(List<PortfolioPick> picks) {
