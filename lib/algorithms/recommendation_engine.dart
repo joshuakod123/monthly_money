@@ -142,9 +142,7 @@ class StockTraits {
   }
 
   static double _ethicsScoreFor(String code) {
-    const sin = {
-      '033780': 'sin',
-    };
+    const sin = {'033780': 'sin'};
     if (sin.containsKey(code)) return -0.7;
     return 0.2;
   }
@@ -181,6 +179,89 @@ class PortfolioPick {
     required this.weightOfTotal,
     required this.cost,
   });
+}
+
+/// ═══════════════════════════════════════════════════════════
+///  ⭐ NEW: GoalGapAnalysis — 목표 달성 갭 분석
+///  500만원으로 월 20만원 목표 같은 비현실적 케이스를 정직하게 분석
+/// ═══════════════════════════════════════════════════════════
+class GoalGapAnalysis {
+  /// 현재 예산으로 달성 가능한 월 배당
+  final int actualMonthly;
+
+  /// 사용자 목표 월 배당
+  final int targetMonthly;
+
+  /// 달성률 (0.0 ~ 1.0+)
+  final double achievementRate;
+
+  /// 목표를 위해 필요한 총 예산
+  final int requiredBudget;
+
+  /// 현재 예산 대비 부족분
+  final int budgetGap;
+
+  /// 같은 예산을 N년 적립식으로 모았을 때 시뮬레이션
+  final List<MonthlyBuildPlan> buildPlans;
+
+  /// 권장 액션 (3가지 시나리오)
+  final List<GoalRecommendation> recommendations;
+
+  /// 갭이 큰지 (목표 달성률 < 50%)
+  final bool hasSignificantGap;
+
+  const GoalGapAnalysis({
+    required this.actualMonthly,
+    required this.targetMonthly,
+    required this.achievementRate,
+    required this.requiredBudget,
+    required this.budgetGap,
+    required this.buildPlans,
+    required this.recommendations,
+    required this.hasSignificantGap,
+  });
+}
+
+class MonthlyBuildPlan {
+  /// 월 적립금 (만원)
+  final int monthlyContribution;
+
+  /// 목표 달성까지 소요 개월
+  final int monthsToGoal;
+
+  /// 소요 연도
+  final double yearsToGoal;
+
+  /// 그 시점 예상 월 배당
+  final int expectedMonthlyAtGoal;
+
+  const MonthlyBuildPlan({
+    required this.monthlyContribution,
+    required this.monthsToGoal,
+    required this.yearsToGoal,
+    required this.expectedMonthlyAtGoal,
+  });
+}
+
+class GoalRecommendation {
+  final String title;
+  final String description;
+  final String actionLabel;
+  final RecommendationType type;
+
+  const GoalRecommendation({
+    required this.title,
+    required this.description,
+    required this.actionLabel,
+    required this.type,
+  });
+}
+
+enum RecommendationType {
+  lowerTarget,    // 목표 낮추기
+  increaseBudget, // 예산 늘리기
+  monthlyBuild,   // 적립식 투자
+  highYield,      // 고배당 종목 비중 ↑
 }
 
 /// ═══════════════════════════════════════════════════════════
@@ -234,14 +315,10 @@ class RecommendationEngine {
     return dot / (math.sqrt(magA) * math.sqrt(magB));
   }
 
-  /// ═════════════════════════════════════════════════════
-  ///  메인 빌더 — 사용자 성향에 따라 분기
-  /// ═════════════════════════════════════════════════════
   static PortfolioRecommendation buildPortfolio({
     required PersonaProfile persona,
     required List<StockModel> universe,
   }) {
-    // 후보 점수화
     final scored = <_ScoredStock>[];
     for (final s in universe) {
       final score = scoreStock(stock: s, persona: persona);
@@ -253,7 +330,6 @@ class RecommendationEngine {
       return PortfolioRecommendation.empty(persona);
     }
 
-    // ⭐ 핵심 분기: 월급형(매달 균등) 선호 시 커버리지 최적화
     if (persona.cashflowPreference < -0.4) {
       return _buildCoverageOptimized(persona, scored);
     }
@@ -261,36 +337,19 @@ class RecommendationEngine {
     return _buildScoreOptimized(persona, scored);
   }
 
-  /// ═════════════════════════════════════════════════════
-  ///  ⭐ 커버리지 최적화 빌더 (월급형 사용자용)
-  ///
-  ///  목표: 12개월 모두 배당이 들어오도록 종목 조합
-  ///  알고리즘: Weighted Set Cover (NP-hard 근사)
-  ///   - Step 1: 점수 ≥ 임계치인 후보만 필터
-  ///   - Step 2: 매 라운드마다 "(새로 커버되는 달 수 × 점수)" 최대 종목 선택
-  ///   - Step 3: 12개월 모두 커버되거나 최대 종목 수 도달 시 중단
-  ///   - Step 4: 점수 비례 비중 분배
-  /// ═════════════════════════════════════════════════════
   static PortfolioRecommendation _buildCoverageOptimized(
       PersonaProfile persona,
       List<_ScoredStock> scored,
       ) {
-    // 월배당 ETF는 단독으로 12개월 커버 → 최우선
-    // 그 외는 다양한 지급월 조합으로 메꿈
-
-    final targetMonths = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12};
     final coveredMonths = <int>{};
     final selected = <_ScoredStock>[];
     final maxPicks = 8;
 
-    // Step 1: 후보 풀 (점수 0.25 이상)
     final candidates = scored.where((s) => s.score >= 0.25).toList();
     if (candidates.isEmpty) {
-      // 폴백: 점수 무관 상위 사용
       candidates.addAll(scored.take(15));
     }
 
-    // Step 2: 그리디 - 매 라운드마다 marginal coverage gain 최대 종목 선택
     while (coveredMonths.length < 12 && selected.length < maxPicks) {
       _ScoredStock? bestPick;
       double bestGain = -1;
@@ -298,14 +357,9 @@ class RecommendationEngine {
       for (final c in candidates) {
         if (selected.any((s) => s.stock.code == c.stock.code)) continue;
 
-        // 이 종목이 새로 커버하는 달 수
-        final newMonths = c.stock.paymentMonths
-            .toSet()
-            .difference(coveredMonths)
-            .length;
+        final newMonths =
+            c.stock.paymentMonths.toSet().difference(coveredMonths).length;
 
-        // gain = 새 커버 달 수 × (1 + 점수)
-        // 새 달이 없어도 점수 높으면 약간의 가치
         final gain = newMonths * (1.0 + c.score) +
             (newMonths == 0 ? c.score * 0.3 : 0);
 
@@ -319,11 +373,9 @@ class RecommendationEngine {
       selected.add(bestPick);
       coveredMonths.addAll(bestPick.stock.paymentMonths);
 
-      // 12개월 다 채웠고 4종목 이상이면 종료
       if (coveredMonths.length == 12 && selected.length >= 4) break;
     }
 
-    // 최소 4종목 보장
     if (selected.length < 4) {
       for (final c in scored) {
         if (selected.any((s) => s.stock.code == c.stock.code)) continue;
@@ -335,14 +387,12 @@ class RecommendationEngine {
     return _allocateWeights(persona, selected, coveredMonths);
   }
 
-  /// ═════════════════════════════════════════════════════
-  ///  점수 최적화 빌더 (분기형/연배당 OK인 사용자용)
-  /// ═════════════════════════════════════════════════════
   static PortfolioRecommendation _buildScoreOptimized(
       PersonaProfile persona,
       List<_ScoredStock> scored,
       ) {
-    final targetCount = (5 + persona.diversificationDemand * 3).round().clamp(5, 8);
+    final targetCount =
+    (5 + persona.diversificationDemand * 3).round().clamp(5, 8);
     final selected = <_ScoredStock>[];
     final sectorTallies = <String, int>{};
 
@@ -372,27 +422,6 @@ class RecommendationEngine {
     return _allocateWeights(persona, selected, coveredMonths);
   }
 
-  /// ═════════════════════════════════════════════════════
-  ///  공통: 점수 비례로 주식 수 분배
-  /// ═════════════════════════════════════════════════════
-  /// ═════════════════════════════════════════════════════
-  ///  공통: 예산 기반 비중 분배 (수정됨)
-  ///
-  ///  핵심 변경:
-  ///   - monthlyTarget만 보고 주식 수 계산하던 옛 로직 제거
-  ///   - persona.budget 안에서 점수 비례로 분배
-  ///   - 한 종목당 최소 1주는 사도록 보장
-  ///   - "예산 부족해서 목표 미달"인 경우도 정직하게 표시
-  /// ═════════════════════════════════════════════════════
-  /// ═════════════════════════════════════════════════════
-  ///  공통: 예산 기반 비중 분배 v2
-  ///
-  ///  핵심 개선:
-  ///   1. 목표 비중을 점수 기반으로 미리 계산 (한 종목 30% 상한)
-  ///   2. 각 종목에 (예산 × 목표 비중)만큼만 할당
-  ///   3. 한 종목이 예산을 독식하지 못하게 방지
-  ///   4. 잔여 예산은 비중 큰 순으로 균등 분배
-  /// ═════════════════════════════════════════════════════
   static PortfolioRecommendation _allocateWeights(
       PersonaProfile persona,
       List<_ScoredStock> selected,
@@ -402,12 +431,9 @@ class RecommendationEngine {
 
     final budget = persona.budget;
 
-    // ── 1단계: 목표 비중 계산 (점수 기반, 상한 30%)
-    // 한 종목이 예산의 30% 이상 차지하지 못하게
     const maxWeight = 0.30;
     const minWeight = 0.05;
 
-    // 점수를 비중으로 변환 (소프트맥스 비슷한 효과)
     final rawWeights = selected.map((s) => s.score).toList();
     final totalScore = rawWeights.fold<double>(0, (a, b) => a + b);
 
@@ -415,14 +441,11 @@ class RecommendationEngine {
     if (totalScore > 0) {
       targetWeights = rawWeights.map((w) => w / totalScore).toList();
     } else {
-      // 점수 다 0이면 균등 분배
       targetWeights = List.filled(selected.length, 1.0 / selected.length);
     }
 
-    // 상한/하한 적용 후 재정규화
     targetWeights = _normalizeWeights(targetWeights, minWeight, maxWeight);
 
-    // ── 2단계: 각 종목에 (예산 × 목표 비중) 할당해서 살 수 있는 주식 수 계산
     final preliminary = <_PreliminaryPick>[];
 
     for (var i = 0; i < selected.length; i++) {
@@ -433,7 +456,6 @@ class RecommendationEngine {
       final targetBudget = budget * targetWeights[i];
       int shares = (targetBudget / stock.price).floor();
 
-      // 비중 작아도 최소 1주는 사고 싶음 (단, 한 주가 전체 예산의 50%를 넘지 않을 때만)
       if (shares < 1 && stock.price <= budget * 0.5) {
         shares = 1;
       }
@@ -449,16 +471,12 @@ class RecommendationEngine {
       ));
     }
 
-    // ── 3단계: 잔여 예산으로 추가 매수 (비중 미달 종목 우선)
     int totalSpent = preliminary.fold(0, (a, p) => a + p.cost.round());
     int remaining = budget - totalSpent;
 
-    // 안전장치: 무한 루프 방지 (최대 1000회 반복)
     int iter = 0;
     while (remaining > 0 && iter < 1000) {
       iter++;
-
-      // 현재 비중과 목표 비중의 차이가 가장 큰 종목 찾기
       final actualTotal = preliminary.fold<double>(0, (a, p) => a + p.cost);
       if (actualTotal == 0) break;
 
@@ -469,11 +487,8 @@ class RecommendationEngine {
         final p = preliminary[i];
         if (p.stock.price > remaining) continue;
 
-        // 이 종목의 현재 비중 vs 목표 비중
-        // selected와 preliminary가 같은 인덱스라는 보장이 없으니 score로 매칭
-        final selectedIdx = selected.indexWhere(
-              (s) => s.stock.code == p.stock.code,
-        );
+        final selectedIdx =
+        selected.indexWhere((s) => s.stock.code == p.stock.code);
         if (selectedIdx < 0) continue;
 
         final targetW = targetWeights[selectedIdx];
@@ -486,10 +501,8 @@ class RecommendationEngine {
         }
       }
 
-      // 더 살 종목이 없거나, 모두 목표 비중 도달 → 종료
       if (bestIdx == null || biggestUnderweight < 0.01) break;
 
-      // 1주 추가
       final p = preliminary[bestIdx];
       final newShares = p.shares + 1;
       final newCost = newShares * p.stock.price;
@@ -503,7 +516,6 @@ class RecommendationEngine {
       remaining -= p.stock.price.round();
     }
 
-    // ── 4단계: 최종 비중% 계산
     final actualTotal = preliminary.fold<double>(0, (a, p) => a + p.cost);
     final picks = <PortfolioPick>[];
     for (final p in preliminary) {
@@ -527,20 +539,19 @@ class RecommendationEngine {
     );
   }
 
-  /// 비중 정규화: 상한/하한 적용 후 합이 1이 되도록
   static List<double> _normalizeWeights(
-      List<double> weights, double min, double max,
+      List<double> weights,
+      double min,
+      double max,
       ) {
     if (weights.isEmpty) return weights;
 
     var result = [...weights];
 
-    // 1) 상한 적용
     for (var i = 0; i < result.length; i++) {
       if (result[i] > max) result[i] = max;
     }
 
-    // 2) 합이 1 미만이면 부족분을 비중 작은 종목에 분배
     var sum = result.reduce((a, b) => a + b);
     if (sum < 1.0) {
       final shortfall = 1.0 - sum;
@@ -556,18 +567,15 @@ class RecommendationEngine {
       }
     }
 
-    // 3) 합이 1 초과면 비례 축소
     sum = result.reduce((a, b) => a + b);
     if (sum > 1.0) {
       result = result.map((w) => w / sum).toList();
     }
 
-    // 4) 하한 적용 (작은 비중도 의미 있게)
     for (var i = 0; i < result.length; i++) {
       if (result[i] < min) result[i] = min;
     }
 
-    // 5) 다시 정규화
     sum = result.reduce((a, b) => a + b);
     if (sum > 0) {
       result = result.map((w) => w / sum).toList();
@@ -584,6 +592,118 @@ class RecommendationEngine {
           (sectorWeights[p.stock.sector.name] ?? 0) + p.weightOfTotal;
     }
     return sectorWeights.values.fold<double>(0, (a, w) => a + w * w);
+  }
+
+  /// ═════════════════════════════════════════════════════
+  ///  ⭐ NEW: 목표 갭 분석
+  ///  500만원 → 월 20만원 같은 케이스를 정직하게 분석
+  /// ═════════════════════════════════════════════════════
+  static GoalGapAnalysis analyzeGoalGap({
+    required PersonaProfile persona,
+    required PortfolioRecommendation rec,
+  }) {
+    final actualMonthly = rec.totalMonthlyDividend.round();
+    final targetMonthly = persona.monthlyTarget;
+    final achievementRate =
+    targetMonthly > 0 ? actualMonthly / targetMonthly : 0.0;
+
+    // 평균 배당수익률 (현재 포트폴리오 기준)
+    double avgYield = 0;
+    if (rec.picks.isNotEmpty) {
+      final totalCost = rec.picks.fold<double>(0, (a, p) => a + p.cost);
+      if (totalCost > 0) {
+        avgYield = rec.picks.fold<double>(
+          0,
+              (a, p) => a + p.stock.dividendYield * p.cost,
+        ) /
+            totalCost /
+            100;
+      }
+    }
+    if (avgYield <= 0) avgYield = 0.05; // 폴백 5%
+
+    // 목표 달성에 필요한 총 예산: target_monthly * 12 / yield
+    final requiredBudget = (targetMonthly * 12 / avgYield).round();
+    final budgetGap = requiredBudget - persona.budget;
+
+    // 적립식 시나리오 (3가지: 10만/30만/50만)
+    final buildPlans = <MonthlyBuildPlan>[];
+    for (final monthly in [100000, 300000, 500000]) {
+      // 단순 적립 (이자 0%): 부족분 ÷ 월 적립금
+      final months = budgetGap > 0
+          ? (budgetGap / monthly).ceil()
+          : 0;
+      // 갈 수 있는 한계: 30년
+      if (months > 0 && months <= 360) {
+        buildPlans.add(MonthlyBuildPlan(
+          monthlyContribution: monthly,
+          monthsToGoal: months,
+          yearsToGoal: months / 12.0,
+          expectedMonthlyAtGoal: targetMonthly,
+        ));
+      }
+    }
+
+    // 권장 액션
+    final recommendations = <GoalRecommendation>[];
+
+    if (achievementRate < 0.5) {
+      // 케이스 1: 갭 큼 → 3가지 옵션 제시
+      // 옵션 A: 목표 낮추기 (현실적 목표)
+      final realisticTarget = (actualMonthly / 10000).floor() * 10000;
+      recommendations.add(GoalRecommendation(
+        title: '목표를 ₩${_fmtKrw(realisticTarget)}으로',
+        description:
+        '현재 예산으로 달성 가능한 현실적인 목표예요. 도달 후 점진적으로 늘릴 수 있어요',
+        actionLabel: '목표 낮추기',
+        type: RecommendationType.lowerTarget,
+      ));
+
+      // 옵션 B: 적립식
+      if (buildPlans.isNotEmpty) {
+        final mid = buildPlans[1]; // 30만원
+        recommendations.add(GoalRecommendation(
+          title: '월 ₩${_fmtKrw(mid.monthlyContribution)} 적립식',
+          description:
+          '약 ${mid.yearsToGoal.toStringAsFixed(1)}년 후 목표 도달. 시간이 자산을 익혀줍니다',
+          actionLabel: '적립 계획 보기',
+          type: RecommendationType.monthlyBuild,
+        ));
+      }
+
+      // 옵션 C: 예산 늘리기
+      recommendations.add(GoalRecommendation(
+        title: '추가 ₩${_fmtKrw(budgetGap)} 투자',
+        description: '한 번에 목표 달성. 예산 한도를 늘려 추천을 다시 받아보세요',
+        actionLabel: '예산 조정',
+        type: RecommendationType.increaseBudget,
+      ));
+    } else if (achievementRate < 0.95) {
+      // 케이스 2: 거의 달성 → 미세 조정
+      recommendations.add(GoalRecommendation(
+        title: '${(achievementRate * 100).round()}% 달성',
+        description: '거의 다 왔어요. 고배당 ETF 비중을 조금 늘리면 100%에 도달할 수 있어요',
+        actionLabel: '고배당 비중 ↑',
+        type: RecommendationType.highYield,
+      ));
+    }
+
+    return GoalGapAnalysis(
+      actualMonthly: actualMonthly,
+      targetMonthly: targetMonthly,
+      achievementRate: achievementRate,
+      requiredBudget: requiredBudget,
+      budgetGap: budgetGap > 0 ? budgetGap : 0,
+      buildPlans: buildPlans,
+      recommendations: recommendations,
+      hasSignificantGap: achievementRate < 0.5,
+    );
+  }
+
+  static String _fmtKrw(int v) {
+    if (v >= 100000000) return '${(v / 100000000).toStringAsFixed(1)}억';
+    if (v >= 10000) return '${(v / 10000).toStringAsFixed(0)}만';
+    return v.toString();
   }
 }
 
@@ -609,14 +729,14 @@ class _PreliminaryPick {
 }
 
 /// ═══════════════════════════════════════════════════════════
-///  PortfolioRecommendation — 결과 (coveredMonths 추가)
+///  PortfolioRecommendation
 /// ═══════════════════════════════════════════════════════════
 class PortfolioRecommendation {
   final PersonaProfile persona;
   final List<PortfolioPick> picks;
   final double hhi;
   final double diversityScore;
-  final Set<int> coveredMonths; // ⭐ 캘린더 UI가 사용
+  final Set<int> coveredMonths;
 
   PortfolioRecommendation({
     required this.persona,
@@ -628,7 +748,10 @@ class PortfolioRecommendation {
 
   factory PortfolioRecommendation.empty(PersonaProfile p) =>
       PortfolioRecommendation(
-        persona: p, picks: [], hhi: 1.0, diversityScore: 0,
+        persona: p,
+        picks: [],
+        hhi: 1.0,
+        diversityScore: 0,
         coveredMonths: {},
       );
 
@@ -647,35 +770,38 @@ class PortfolioRecommendation {
     return map;
   }
 
-  /// 커버리지 점수 (0-12)
   int get coverageCount => coveredMonths.length;
-
-  /// 커버리지 비율 (0.0-1.0)
   double get coverageRate => coveredMonths.length / 12.0;
 
   List<String> rationale() {
     final reasons = <String>[];
     final p = persona;
-    final achievementPct = (totalMonthlyDividend / p.monthlyTarget * 100).round();
+    final achievementPct =
+    (totalMonthlyDividend / p.monthlyTarget * 100).round();
 
     if (achievementPct >= 95) {
-      reasons.add('예산 ${formatBudget(p.budget)}으로 목표 월 ${formatBudget(p.monthlyTarget)}을 거의 달성할 수 있어요');
+      reasons.add(
+          '예산 ${formatBudget(p.budget)}으로 목표 월 ${formatBudget(p.monthlyTarget)}을 거의 달성할 수 있어요');
     } else if (achievementPct >= 60) {
-      reasons.add('현재 예산으로는 월 ${formatBudget(totalMonthlyDividend.round())} (목표의 $achievementPct%) 받을 수 있어요');
+      reasons.add(
+          '현재 예산으로는 월 ${formatBudget(totalMonthlyDividend.round())} (목표의 $achievementPct%) 받을 수 있어요');
     } else if (achievementPct >= 30) {
       final neededBudget = (p.budget / (achievementPct / 100)).round();
-      reasons.add('월 ${formatBudget(p.monthlyTarget)} 달성하려면 ${formatBudget(neededBudget)} 필요해요. 현재는 월 ${formatBudget(totalMonthlyDividend.round())} 받을 수 있어요');
+      reasons.add(
+          '월 ${formatBudget(p.monthlyTarget)} 달성하려면 ${formatBudget(neededBudget)} 필요해요. 현재는 월 ${formatBudget(totalMonthlyDividend.round())} 받을 수 있어요');
     } else {
-      reasons.add('지금 예산으로는 월 ${formatBudget(totalMonthlyDividend.round())} 정도예요. 매달 적립식 투자를 추천드려요');
+      reasons.add(
+          '지금 예산으로는 월 ${formatBudget(totalMonthlyDividend.round())} 정도예요. 매달 적립식 투자를 추천드려요');
     }
-    // ⭐ 월급형 사용자는 커버리지 강조
+
     if (p.cashflowPreference < -0.4) {
       if (coveredMonths.length == 12) {
         reasons.add('1월부터 12월까지 매달 배당이 들어오도록 종목을 조합했어요');
       } else if (coveredMonths.length >= 9) {
         reasons.add('${coveredMonths.length}개월 커버 — 거의 매달 배당이 들어와요');
       } else {
-        reasons.add('${coveredMonths.length}개월 커버 (월배당 ETF를 더 추가하면 12개월 커버 가능)');
+        reasons.add(
+            '${coveredMonths.length}개월 커버 (월배당 ETF를 더 추가하면 12개월 커버 가능)');
       }
     }
 
@@ -699,11 +825,16 @@ class PortfolioRecommendation {
     if (p.excludedSectors.isNotEmpty) {
       final excluded = p.excludedSectors.map((s) {
         switch (s) {
-          case 'gambling': return '도박';
-          case 'sin': return '담배·주류';
-          case 'fossil': return '화석연료';
-          case 'defense': return '방산';
-          default: return s;
+          case 'gambling':
+            return '도박';
+          case 'sin':
+            return '담배·주류';
+          case 'fossil':
+            return '화석연료';
+          case 'defense':
+            return '방산';
+          default:
+            return s;
         }
       }).join(', ');
       reasons.add('제외 요청 산업($excluded)은 모두 빼고 추천했어요');

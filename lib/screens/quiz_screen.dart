@@ -2,18 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../algorithms/persona_profile.dart';
 import '../providers/app_providers.dart';
 import '../theme/app_theme.dart';
-import '../widgets/common_widgets.dart';
 import 'quiz_result_screen.dart';
 
-/// ═══════════════════════════════════════════════════════════
-///  QuizScreen — Linear/Vercel 톤
-///   - 다크 테마 정착 (흰 배경 카드 제거)
-///   - 보더 기반 선택 표시
-///   - 절제된 액센트 사용
-/// ═══════════════════════════════════════════════════════════
 class QuizScreen extends ConsumerStatefulWidget {
   const QuizScreen({super.key});
   @override
@@ -81,8 +75,6 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
 
     if (!mounted) return;
 
-    // 기존 Navigator.pop 대신 → 영수증 결과 화면으로 push
-    // pushReplacement 쓰면 뒤로가기 시 퀴즈로 안 돌아감 (의도)
     Navigator.of(context).pushReplacement(
       MaterialPageRoute(builder: (_) => const QuizResultScreen()),
     );
@@ -93,62 +85,110 @@ class _QuizScreenState extends ConsumerState<QuizScreen> {
     final progress = (_currentIndex + 1) / _totalSteps;
 
     return Scaffold(
-      backgroundColor: AppColors.bg,
-      appBar: AppBar(
-        backgroundColor: AppColors.bg,
-        foregroundColor: AppColors.textPrimary,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, size: 20),
-          onPressed: _currentIndex == 0 ? () => Navigator.pop(context) : _goPrev,
-        ),
-        title: Text(
-          '${_currentIndex + 1} / $_totalSteps',
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-            color: AppColors.textTertiary,
-            letterSpacing: 0.5,
-          ),
-        ),
-        centerTitle: true,
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(2),
-          child: Stack(
-            children: [
-              Container(height: 2, color: AppColors.border),
-              AnimatedFractionallySizedBox(
-                duration: const Duration(milliseconds: 320),
-                curve: Curves.easeOutCubic,
-                widthFactor: progress,
-                child: Container(height: 2, color: AppColors.accent),
+      backgroundColor: AppColors.canvas,
+      body: SafeArea(
+        child: Column(
+          children: [
+            // ── 상단 바
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 24, 8),
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: _currentIndex == 0
+                        ? () => Navigator.pop(context)
+                        : _goPrev,
+                    child: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(AppRadius.full),
+                        border: Border.all(color: AppColors.border, width: 1),
+                      ),
+                      child: const Icon(
+                        Icons.arrow_back_rounded,
+                        size: 16,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '${_currentIndex + 1} / $_totalSteps',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textTertiary,
+                      letterSpacing: 0.5,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                  const Spacer(),
+                  const SizedBox(width: 36),
+                ],
               ),
-            ],
-          ),
+            ),
+            // ── 프로그레스 바
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Stack(
+                children: [
+                  Container(
+                    height: 2,
+                    decoration: BoxDecoration(
+                      color: AppColors.borderSoft,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                  AnimatedFractionallySizedBox(
+                    duration: const Duration(milliseconds: 320),
+                    curve: Curves.easeOutCubic,
+                    widthFactor: progress,
+                    child: Container(
+                      height: 2,
+                      decoration: BoxDecoration(
+                        color: AppColors.wine,
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: PageView(
+                controller: _pageController,
+                physics: const NeverScrollableScrollPhysics(),
+                children: [
+                  ...QuizBank.questions.map((q) => _QuestionPage(
+                    question: q,
+                    selected: _answers[q.id] ?? [],
+                    onTap: (idx) => _onAnswer(q, idx),
+                    onContinue: q.type == QuestionType.multiChoice
+                        ? _goNext
+                        : null,
+                  )),
+                  _GoalPage(
+                    monthlyTarget: _monthlyTarget,
+                    budget: _budget,
+                    preferredSectors: _preferredSectors,
+                    onTargetChanged: (v) =>
+                        setState(() => _monthlyTarget = v),
+                    onBudgetChanged: (v) => setState(() => _budget = v),
+                    onSectorsChanged: (v) => setState(() {
+                      _preferredSectors
+                        ..clear()
+                        ..addAll(v);
+                    }),
+                    onFinish: _finish,
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
-      ),
-      body: PageView(
-        controller: _pageController,
-        physics: const NeverScrollableScrollPhysics(),
-        children: [
-          ...QuizBank.questions.map((q) => _QuestionPage(
-            question: q,
-            selected: _answers[q.id] ?? [],
-            onTap: (idx) => _onAnswer(q, idx),
-            onContinue: q.type == QuestionType.multiChoice ? _goNext : null,
-          )),
-          _GoalPage(
-            monthlyTarget: _monthlyTarget,
-            budget: _budget,
-            preferredSectors: _preferredSectors,
-            onTargetChanged: (v) => setState(() => _monthlyTarget = v),
-            onBudgetChanged: (v) => setState(() => _budget = v),
-            onSectorsChanged: (v) => setState(() {
-              _preferredSectors..clear()..addAll(v);
-            }),
-            onFinish: _finish,
-          ),
-        ],
       ),
     );
   }
@@ -173,35 +213,50 @@ class _QuestionPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(24, 32, 24, 32),
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+      physics: const BouncingScrollPhysics(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 질문
+          Row(
+            children: [
+              Container(width: 20, height: 1.5, color: AppColors.wine),
+              const SizedBox(width: 8),
+              Text(
+                'QUESTION',
+                style: GoogleFonts.inter(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.wine,
+                  letterSpacing: 2,
+                ),
+              ),
+            ],
+          ).animate().fadeIn(duration: 280.ms),
+          const SizedBox(height: 12),
           Text(
             question.question,
-            style: const TextStyle(
-              fontSize: 22,
+            style: GoogleFonts.playfairDisplay(
+              fontSize: 24,
               fontWeight: FontWeight.w600,
               color: AppColors.textPrimary,
-              letterSpacing: -0.5,
-              height: 1.35,
+              letterSpacing: -0.6,
+              height: 1.3,
             ),
-          ).animate().fadeIn(duration: 280.ms).slideY(begin: 0.05),
+          ).animate().fadeIn(duration: 320.ms).slideY(begin: 0.05),
           if (question.subtitle != null) ...[
             const SizedBox(height: 8),
             Text(
               question.subtitle!,
-              style: const TextStyle(
+              style: GoogleFonts.inter(
                 fontSize: 13,
                 color: AppColors.textTertiary,
                 height: 1.5,
+                fontStyle: FontStyle.italic,
               ),
             ).animate().fadeIn(delay: 80.ms, duration: 280.ms),
           ],
-          const SizedBox(height: 32),
-
-          // 옵션들
+          const SizedBox(height: 28),
           ...question.options.asMap().entries.map((entry) {
             final idx = entry.key;
             final opt = entry.value;
@@ -221,8 +276,6 @@ class _QuestionPage extends StatelessWidget {
                   .slideY(begin: 0.08),
             );
           }),
-
-          // multi-choice일 때만 다음 버튼
           if (onContinue != null && selected.isNotEmpty) ...[
             const SizedBox(height: 16),
             _ContinueButton(onPressed: onContinue!)
@@ -235,9 +288,6 @@ class _QuestionPage extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════
-//  옵션 타일 — Linear 톤 (다크, 보더 기반 선택)
-// ═══════════════════════════════════════════════════════════
 class _OptionTile extends StatelessWidget {
   final QuizOption option;
   final bool isSelected;
@@ -259,26 +309,25 @@ class _OptionTile extends StatelessWidget {
         curve: Curves.easeOut,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.accentGhost : AppColors.bgElevated,
+          color: isSelected ? AppColors.accentGhost : AppColors.surface,
           borderRadius: BorderRadius.circular(AppRadius.md),
           border: Border.all(
-            color: isSelected ? AppColors.accent : AppColors.border,
-            width: 1,
+            color: isSelected ? AppColors.wine : AppColors.border,
+            width: isSelected ? 1.5 : 1,
           ),
         ),
         child: Row(
           children: [
-            // 이모지 컨테이너
             Container(
               width: 38,
               height: 38,
               decoration: BoxDecoration(
-                color: AppColors.bg,
+                color: AppColors.canvas,
                 borderRadius: BorderRadius.circular(AppRadius.sm),
                 border: Border.all(
                   color: isSelected
-                      ? AppColors.accent.withValues(alpha: 0.3)
-                      : AppColors.border,
+                      ? AppColors.wine.withValues(alpha: 0.3)
+                      : AppColors.borderSoft,
                   width: 1,
                 ),
               ),
@@ -286,14 +335,13 @@ class _OptionTile extends StatelessWidget {
               child: Text(option.emoji, style: const TextStyle(fontSize: 18)),
             ),
             const SizedBox(width: 12),
-            // 라벨 + 설명
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     option.label,
-                    style: const TextStyle(
+                    style: GoogleFonts.inter(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                       color: AppColors.textPrimary,
@@ -304,7 +352,7 @@ class _OptionTile extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       option.description!,
-                      style: const TextStyle(
+                      style: GoogleFonts.inter(
                         fontSize: 12,
                         color: AppColors.textTertiary,
                         height: 1.4,
@@ -314,16 +362,16 @@ class _OptionTile extends StatelessWidget {
                 ],
               ),
             ),
-            // 선택 표시 — 작은 점만
             if (isSelected)
               Container(
                 width: 16,
                 height: 16,
                 decoration: const BoxDecoration(
-                  color: AppColors.accent,
+                  color: AppColors.wine,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.check, size: 11, color: AppColors.bg),
+                child: const Icon(Icons.check,
+                    size: 11, color: AppColors.surface),
               ),
           ],
         ),
@@ -332,9 +380,6 @@ class _OptionTile extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════
-//  공통 다음/완료 버튼
-// ═══════════════════════════════════════════════════════════
 class _ContinueButton extends StatelessWidget {
   final VoidCallback onPressed;
   final String label;
@@ -350,33 +395,33 @@ class _ContinueButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return SizedBox(
       width: double.infinity,
-      child: ElevatedButton(
-        onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.textPrimary,
-          foregroundColor: AppColors.bg,
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          shape: RoundedRectangleBorder(
+      child: GestureDetector(
+        onTap: onPressed,
+        behavior: HitTestBehavior.opaque,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          decoration: BoxDecoration(
+            color: AppColors.wine,
             borderRadius: BorderRadius.circular(AppRadius.md),
           ),
-          elevation: 0,
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            if (icon != null) ...[
-              Icon(icon, size: 16),
-              const SizedBox(width: 8),
-            ],
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                letterSpacing: -0.2,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (icon != null) ...[
+                Icon(icon, size: 16, color: AppColors.surface),
+                const SizedBox(width: 8),
+              ],
+              Text(
+                label,
+                style: GoogleFonts.inter(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.surface,
+                  letterSpacing: -0.2,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -384,7 +429,7 @@ class _ContinueButton extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  마지막 페이지 — 목표 + 예산
+//  ⭐ 마지막 페이지 — 직접 타이핑 입력 (개선)
 // ═══════════════════════════════════════════════════════════
 class _GoalPage extends StatefulWidget {
   final int monthlyTarget;
@@ -422,24 +467,11 @@ class _GoalPageState extends State<_GoalPage> {
     _budgetCtrl = TextEditingController(text: _formatPlain(widget.budget));
 
     _targetFocus.addListener(() {
-      if (!_targetFocus.hasFocus) _commitTarget();
       setState(() {});
     });
     _budgetFocus.addListener(() {
-      if (!_budgetFocus.hasFocus) _commitBudget();
       setState(() {});
     });
-  }
-
-  @override
-  void didUpdateWidget(_GoalPage old) {
-    super.didUpdateWidget(old);
-    if (!_targetFocus.hasFocus && widget.monthlyTarget != old.monthlyTarget) {
-      _targetCtrl.text = _formatPlain(widget.monthlyTarget);
-    }
-    if (!_budgetFocus.hasFocus && widget.budget != old.budget) {
-      _budgetCtrl.text = _formatPlain(widget.budget);
-    }
   }
 
   @override
@@ -461,21 +493,25 @@ class _GoalPageState extends State<_GoalPage> {
     return buf.toString();
   }
 
+  String _shortKrw(int v) {
+    if (v >= 100000000) return '${(v / 100000000).toStringAsFixed(1)}억';
+    if (v >= 10000) return '${(v / 10000).toStringAsFixed(0)}만원';
+    return '${v}원';
+  }
+
   int _parse(String text) {
     final cleaned = text.replaceAll(RegExp(r'[^0-9]'), '');
     return int.tryParse(cleaned) ?? 0;
   }
 
-  void _commitTarget() {
-    final v = _parse(_targetCtrl.text).clamp(100000, 50000000);
+  void _onTargetTextChanged(String text) {
+    final v = _parse(text).clamp(0, 50000000);
     widget.onTargetChanged(v);
-    _targetCtrl.text = _formatPlain(v);
   }
 
-  void _commitBudget() {
-    final v = _parse(_budgetCtrl.text).clamp(1000000, 2000000000);
+  void _onBudgetTextChanged(String text) {
+    final v = _parse(text).clamp(0, 2000000000);
     widget.onBudgetChanged(v);
-    _budgetCtrl.text = _formatPlain(v);
   }
 
   @override
@@ -483,95 +519,113 @@ class _GoalPageState extends State<_GoalPage> {
     return GestureDetector(
       onTap: () => FocusScope.of(context).unfocus(),
       child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(24, 32, 24, 32),
+        padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+        physics: const BouncingScrollPhysics(),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              '마지막으로,\n목표와 예산을 알려주세요',
-              style: TextStyle(
-                fontSize: 22,
+            Row(
+              children: [
+                Container(width: 20, height: 1.5, color: AppColors.wine),
+                const SizedBox(width: 8),
+                Text(
+                  'FINAL STEP',
+                  style: GoogleFonts.inter(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.wine,
+                    letterSpacing: 2,
+                  ),
+                ),
+              ],
+            ).animate().fadeIn(duration: 280.ms),
+            const SizedBox(height: 12),
+            Text(
+              '목표와 예산을\n알려주세요',
+              style: GoogleFonts.playfairDisplay(
+                fontSize: 28,
                 fontWeight: FontWeight.w600,
                 color: AppColors.textPrimary,
-                letterSpacing: -0.5,
-                height: 1.35,
+                letterSpacing: -0.8,
+                height: 1.25,
               ),
-            ).animate().fadeIn(duration: 280.ms).slideY(begin: 0.05),
+            ).animate().fadeIn(duration: 320.ms).slideY(begin: 0.05),
             const SizedBox(height: 8),
-            const Text(
-              '직접 입력하거나 슬라이더로 조절',
-              style: TextStyle(
+            Text(
+              '직접 입력하세요 — 단위는 원',
+              style: GoogleFonts.inter(
                 fontSize: 13,
                 color: AppColors.textTertiary,
                 height: 1.5,
+                fontStyle: FontStyle.italic,
               ),
             ).animate().fadeIn(delay: 80.ms),
-            const SizedBox(height: 32),
 
-            _AmountInput(
+            const SizedBox(height: 28),
+
+            // ── 월 배당 목표 입력
+            _DirectInput(
               label: '월 배당 목표',
               controller: _targetCtrl,
               focusNode: _targetFocus,
-              hint: '연 ${formatKRW(widget.monthlyTarget * 12)}',
-              onCommit: _commitTarget,
-              onTextChanged: (text) {
-                final v = _parse(text);
-                widget.onTargetChanged(v);
-              },
-              sliderValue: widget.monthlyTarget.toDouble(),
-              sliderMin: 100000,
-              sliderMax: 10000000,
-              sliderDivisions: 99,
-              onSliderChanged: (v) => widget.onTargetChanged(v.round()),
+              hint: _shortKrw(widget.monthlyTarget * 12) + ' (연)',
+              onChanged: _onTargetTextChanged,
               quick: const [500000, 1000000, 2000000, 3000000, 5000000],
               current: widget.monthlyTarget,
               onPick: (v) {
                 widget.onTargetChanged(v);
                 _targetCtrl.text = _formatPlain(v);
+                _targetCtrl.selection = TextSelection.fromPosition(
+                  TextPosition(offset: _targetCtrl.text.length),
+                );
               },
             ),
-            const SizedBox(height: 20),
 
-            _AmountInput(
+            const SizedBox(height: 16),
+
+            // ── 투자 예산 입력
+            _DirectInput(
               label: '투자 예산',
               controller: _budgetCtrl,
               focusNode: _budgetFocus,
               hint: '한 번에 투자 가능한 총액',
-              onCommit: _commitBudget,
-              onTextChanged: (text) {
-                final v = _parse(text);
-                widget.onBudgetChanged(v);
-              },
-              sliderValue: widget.budget.toDouble(),
-              sliderMin: 1000000,
-              sliderMax: 500000000,
-              sliderDivisions: 100,
-              onSliderChanged: (v) => widget.onBudgetChanged(v.round()),
-              quick: const [10000000, 30000000, 50000000, 100000000, 200000000],
+              onChanged: _onBudgetTextChanged,
+              quick: const [
+                10000000,
+                30000000,
+                50000000,
+                100000000,
+                200000000
+              ],
               current: widget.budget,
               onPick: (v) {
                 widget.onBudgetChanged(v);
                 _budgetCtrl.text = _formatPlain(v);
+                _budgetCtrl.selection = TextSelection.fromPosition(
+                  TextPosition(offset: _budgetCtrl.text.length),
+                );
               },
             ),
-            const SizedBox(height: 28),
+
+            const SizedBox(height: 24),
 
             // ── 선호 섹터
-            const Text(
+            Text(
               '선호 섹터',
-              style: TextStyle(
-                fontSize: 14,
+              style: GoogleFonts.inter(
+                fontSize: 13,
                 fontWeight: FontWeight.w600,
                 color: AppColors.textPrimary,
                 letterSpacing: -0.2,
               ),
             ),
             const SizedBox(height: 4),
-            const Text(
+            Text(
               '선택사항 — 비워두면 자동 분산',
-              style: TextStyle(
-                fontSize: 12,
+              style: GoogleFonts.inter(
+                fontSize: 11,
                 color: AppColors.textTertiary,
+                fontStyle: FontStyle.italic,
               ),
             ),
             const SizedBox(height: 12),
@@ -603,7 +657,7 @@ class _GoalPageState extends State<_GoalPage> {
               }).toList(),
             ),
 
-            const SizedBox(height: 36),
+            const SizedBox(height: 32),
 
             _ContinueButton(
               onPressed: widget.onFinish,
@@ -617,34 +671,25 @@ class _GoalPageState extends State<_GoalPage> {
   }
 }
 
-class _AmountInput extends StatelessWidget {
+// ═══════════════════════════════════════════════════════════
+//  Direct Input — 슬라이더 없이 깔끔한 타이핑 입력
+// ═══════════════════════════════════════════════════════════
+class _DirectInput extends StatelessWidget {
   final String label;
   final String hint;
   final TextEditingController controller;
   final FocusNode focusNode;
-  final VoidCallback onCommit;
-  final ValueChanged<String> onTextChanged;
-  final double sliderValue;
-  final double sliderMin;
-  final double sliderMax;
-  final int sliderDivisions;
-  final ValueChanged<double> onSliderChanged;
+  final ValueChanged<String> onChanged;
   final List<int> quick;
   final int current;
   final ValueChanged<int> onPick;
 
-  const _AmountInput({
+  const _DirectInput({
     required this.label,
     required this.hint,
     required this.controller,
     required this.focusNode,
-    required this.onCommit,
-    required this.onTextChanged,
-    required this.sliderValue,
-    required this.sliderMin,
-    required this.sliderMax,
-    required this.sliderDivisions,
-    required this.onSliderChanged,
+    required this.onChanged,
     required this.quick,
     required this.current,
     required this.onPick,
@@ -657,11 +702,11 @@ class _AmountInput extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.bgElevated,
+        color: AppColors.surface,
         borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(
-          color: isFocused ? AppColors.accent : AppColors.border,
-          width: 1,
+          color: isFocused ? AppColors.wine : AppColors.border,
+          width: isFocused ? 1.5 : 1,
         ),
       ),
       child: Column(
@@ -672,38 +717,54 @@ class _AmountInput extends StatelessWidget {
             children: [
               Text(
                 label,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
+                style: GoogleFonts.inter(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
                   color: AppColors.textTertiary,
-                  letterSpacing: 0.3,
+                  letterSpacing: 1.2,
                 ),
               ),
               Text(
                 hint,
-                style: const TextStyle(
+                style: GoogleFonts.inter(
                   fontSize: 11,
-                  color: AppColors.textDisabled,
+                  color: AppColors.textTertiary,
+                  fontStyle: FontStyle.italic,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: 6),
+                child: Text(
+                  '₩',
+                  style: GoogleFonts.inter(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w500,
+                    color: AppColors.wine,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
               Expanded(
                 child: TextField(
                   controller: controller,
                   focusNode: focusNode,
                   keyboardType: TextInputType.number,
-                  style: const TextStyle(
+                  textAlign: TextAlign.left,
+                  style: GoogleFonts.inter(
                     color: AppColors.textPrimary,
-                    fontSize: 28,
+                    fontSize: 32,
                     fontWeight: FontWeight.w700,
-                    letterSpacing: -0.8,
+                    letterSpacing: -1,
+                    height: 1,
                   ),
-                  cursorColor: AppColors.accent,
+                  cursorColor: AppColors.wine,
+                  cursorWidth: 2,
                   inputFormatters: [
                     FilteringTextInputFormatter.digitsOnly,
                     _ThousandsFormatter(),
@@ -713,18 +774,20 @@ class _AmountInput extends StatelessWidget {
                     contentPadding: EdgeInsets.zero,
                     border: InputBorder.none,
                     hintText: '0',
-                    hintStyle: TextStyle(color: AppColors.textDisabled),
+                    hintStyle: TextStyle(
+                      color: AppColors.textDisabled,
+                      fontSize: 32,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                  onChanged: onTextChanged,
-                  onSubmitted: (_) => onCommit(),
+                  onChanged: onChanged,
                 ),
               ),
-              const SizedBox(width: 4),
-              const Padding(
-                padding: EdgeInsets.only(bottom: 5),
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
                 child: Text(
                   '원',
-                  style: TextStyle(
+                  style: GoogleFonts.inter(
                     color: AppColors.textTertiary,
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
@@ -733,25 +796,9 @@ class _AmountInput extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          SliderTheme(
-            data: SliderTheme.of(context).copyWith(
-              activeTrackColor: AppColors.accent,
-              inactiveTrackColor: AppColors.border,
-              thumbColor: AppColors.textPrimary,
-              overlayColor: AppColors.accent.withValues(alpha: 0.15),
-              trackHeight: 2,
-              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
-            ),
-            child: Slider(
-              value: sliderValue.clamp(sliderMin, sliderMax),
-              min: sliderMin,
-              max: sliderMax,
-              divisions: sliderDivisions,
-              onChanged: onSliderChanged,
-            ),
-          ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 12),
+          Container(height: 1, color: AppColors.borderSoft),
+          const SizedBox(height: 10),
           Wrap(
             spacing: 6,
             runSpacing: 6,
@@ -761,20 +808,21 @@ class _AmountInput extends StatelessWidget {
                 onTap: () => onPick(v),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 150),
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 5),
                   decoration: BoxDecoration(
-                    color: isSel ? AppColors.accentGhost : Colors.transparent,
+                    color: isSel ? AppColors.wine : Colors.transparent,
                     borderRadius: BorderRadius.circular(AppRadius.full),
                     border: Border.all(
-                      color: isSel ? AppColors.accent : AppColors.border,
+                      color: isSel ? AppColors.wine : AppColors.border,
                       width: 1,
                     ),
                   ),
                   child: Text(
-                    formatKRW(v),
-                    style: TextStyle(
+                    _short(v),
+                    style: GoogleFonts.inter(
                       fontSize: 11,
-                      color: isSel ? AppColors.accent : AppColors.textSecondary,
+                      color: isSel ? AppColors.surface : AppColors.textSecondary,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -785,6 +833,12 @@ class _AmountInput extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _short(int v) {
+    if (v >= 100000000) return '${(v / 100000000).toStringAsFixed(1)}억';
+    if (v >= 10000) return '${(v / 10000).toStringAsFixed(0)}만';
+    return '$v';
   }
 }
 
@@ -807,11 +861,11 @@ class _SectorChip extends StatelessWidget {
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? AppColors.accentGhost : AppColors.bgElevated,
+          color: isSelected ? AppColors.accentGhost : AppColors.surface,
           borderRadius: BorderRadius.circular(AppRadius.full),
           border: Border.all(
-            color: isSelected ? AppColors.accent : AppColors.border,
-            width: 1,
+            color: isSelected ? AppColors.wine : AppColors.border,
+            width: isSelected ? 1.5 : 1,
           ),
         ),
         child: Row(
@@ -821,10 +875,10 @@ class _SectorChip extends StatelessWidget {
             const SizedBox(width: 6),
             Text(
               option.label,
-              style: TextStyle(
-                color: isSelected ? AppColors.accent : AppColors.textPrimary,
+              style: GoogleFonts.inter(
+                color: isSelected ? AppColors.wine : AppColors.textPrimary,
                 fontSize: 12,
-                fontWeight: FontWeight.w500,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ],
