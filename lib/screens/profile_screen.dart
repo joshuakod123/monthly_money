@@ -2,18 +2,14 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:google_fonts/google_fonts.dart';
+import '../algorithms/persona_animal.dart';
 import '../algorithms/persona_profile.dart';
 import '../providers/app_providers.dart';
 import '../theme/app_theme.dart';
-import '../widgets/common_widgets.dart';
+import 'quiz_result_screen.dart';
 import 'quiz_screen.dart';
 
-/// ═══════════════════════════════════════════════════════════
-///  ProfileScreen — Linear 톤
-///   - 8차원을 레이더 차트 하나로 압축
-///   - 목표/예산 한 줄 row
-///   - 컴팩트
-/// ═══════════════════════════════════════════════════════════
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
@@ -22,128 +18,445 @@ class ProfileScreen extends ConsumerWidget {
     final persona = ref.watch(personaProfileProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.bg,
-      appBar: AppBar(
-        backgroundColor: AppColors.bg,
-        title: const Text(
-          '내 정보',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.w600,
-            letterSpacing: -0.2,
-          ),
-        ),
-      ),
+      backgroundColor: AppColors.canvas,
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(24, 16, 24, 100),
-          child: persona == null
-              ? const Center(
-            child: Text(
-              '퀴즈를 먼저 완료해주세요',
-              style: TextStyle(color: AppColors.textTertiary),
-            ),
-          )
-              : Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // ── 페르소나 라벨
-              const Text(
-                'INVESTMENT PROFILE',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.textTertiary,
-                  letterSpacing: 1.2,
-                ),
-              ).animate().fadeIn(duration: 280.ms),
-              const SizedBox(height: 10),
-              Text(
-                persona.summarize(),
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
-                  letterSpacing: -0.8,
-                  height: 1.2,
-                ),
-              ).animate().fadeIn(delay: 100.ms, duration: 320.ms),
-
-              const SizedBox(height: 28),
-
-              // ── 레이더 차트
-              Center(
-                child: _PersonaRadar(persona: persona),
-              ).animate().fadeIn(delay: 200.ms, duration: 480.ms),
-
-              const SizedBox(height: 24),
-
-              // ── 목표 + 예산 (한 줄)
-              _GoalsCompact(persona: persona)
-                  .animate()
-                  .fadeIn(delay: 400.ms, duration: 320.ms),
-
-              const Spacer(),
-
-              // ── 퀴즈 다시 풀기
-              _RetakeButton(onTap: () async {
-                await Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const QuizScreen()),
-                );
-              }).animate().fadeIn(delay: 500.ms, duration: 320.ms),
-            ],
+        bottom: false,
+        child: persona == null
+            ? const Center(
+          child: Text(
+            '퀴즈를 먼저 완료해주세요',
+            style: TextStyle(color: AppColors.textTertiary),
           ),
+        )
+            : ListView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(24, 12, 24, 100),
+          children: [
+            _Header(),
+            const SizedBox(height: 18),
+            _SummaryHeadline(persona: persona),
+            const SizedBox(height: 24),
+            _AnimalCard(animal: PersonaAnimal.fromProfile(persona))
+                .animate()
+                .fadeIn(delay: 150.ms, duration: 400.ms)
+                .slideY(begin: 0.05),
+            const SizedBox(height: 28),
+            const _SectionLabel(label: 'INVESTMENT TRAITS'),
+            const SizedBox(height: 12),
+            _RadarCard(persona: persona)
+                .animate()
+                .fadeIn(delay: 350.ms, duration: 480.ms),
+            const SizedBox(height: 28),
+            const _SectionLabel(label: 'GOALS'),
+            const SizedBox(height: 12),
+            _GoalsCard(persona: persona)
+                .animate()
+                .fadeIn(delay: 500.ms, duration: 320.ms),
+            const SizedBox(height: 28),
+            const _SectionLabel(label: 'ACTIONS'),
+            const SizedBox(height: 12),
+            _ActionTile(
+              icon: Icons.refresh_rounded,
+              label: '퀴즈 다시 풀기',
+              subtitle: '투자 본능을 다시 진단',
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const QuizScreen()),
+              ),
+            ).animate().fadeIn(delay: 600.ms, duration: 320.ms),
+            const SizedBox(height: 8),
+            _ActionTile(
+              icon: Icons.receipt_long_rounded,
+              label: '내 영수증 다시 보기',
+              subtitle: '동물 페르소나와 추천 결과',
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                    builder: (_) => const QuizResultScreen()),
+              ),
+            ).animate().fadeIn(delay: 650.ms, duration: 320.ms),
+            const SizedBox(height: 8),
+            _ActionTile(
+              icon: Icons.info_outline_rounded,
+              label: '배당나무 정보',
+              subtitle: '버전 1.0.0',
+              onTap: () {},
+            ).animate().fadeIn(delay: 700.ms, duration: 320.ms),
+            const SizedBox(height: 32),
+            Center(
+              child: Text(
+                '· 천천히 익어가는 자산 ·',
+                style: GoogleFonts.playfairDisplay(
+                  fontSize: 11,
+                  fontStyle: FontStyle.italic,
+                  color: AppColors.textTertiary,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-// ═══════════════════════════════════════════════════════════
-//  레이더 차트 — 8차원 한 번에 시각화
-// ═══════════════════════════════════════════════════════════
-class _PersonaRadar extends StatelessWidget {
-  final PersonaProfile persona;
+class _Header extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(width: 24, height: 1.5, color: AppColors.wine),
+        const SizedBox(width: 10),
+        Text(
+          'YOUR PROFILE',
+          style: GoogleFonts.inter(
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            color: AppColors.wine,
+            letterSpacing: 2.5,
+          ),
+        ),
+      ],
+    ).animate().fadeIn(duration: 280.ms);
+  }
+}
 
-  const _PersonaRadar({required this.persona});
+class _SummaryHeadline extends StatelessWidget {
+  final PersonaProfile persona;
+  const _SummaryHeadline({required this.persona});
 
   @override
   Widget build(BuildContext context) {
-    // 차원별 라벨 + 값 (-1 ~ +1을 0 ~ 1로 정규화)
+    final traits = persona.summarize().split(' · ');
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 6,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        for (int i = 0; i < traits.length; i++) ...[
+          Text(
+            traits[i],
+            style: GoogleFonts.playfairDisplay(
+              fontSize: 26,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+              letterSpacing: -0.6,
+              height: 1.2,
+            ),
+          ),
+          if (i < traits.length - 1)
+            Text(
+              '·',
+              style: GoogleFonts.playfairDisplay(
+                fontSize: 20,
+                fontWeight: FontWeight.w400,
+                color: AppColors.wine,
+              ),
+            ),
+        ],
+      ],
+    ).animate().fadeIn(delay: 80.ms, duration: 320.ms);
+  }
+}
+
+class _SectionLabel extends StatelessWidget {
+  final String label;
+  const _SectionLabel({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textTertiary,
+            letterSpacing: 1.8,
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Container(height: 1, color: AppColors.borderSoft),
+        ),
+      ],
+    );
+  }
+}
+
+class _AnimalCard extends StatelessWidget {
+  final PersonaAnimal animal;
+  const _AnimalCard({required this.animal});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const QuizResultScreen()),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: animal.signatureBg,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+        ),
+        child: Stack(
+          children: [
+            Positioned(
+              right: -20,
+              top: -20,
+              child: Opacity(
+                opacity: 0.12,
+                child: Text(
+                  animal.emoji,
+                  style: const TextStyle(fontSize: 160),
+                ),
+              ),
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 16,
+                      height: 1,
+                      color: animal.signatureText.withValues(alpha: 0.5),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'YOUR INVESTMENT SPIRIT',
+                      style: GoogleFonts.inter(
+                        fontSize: 9,
+                        fontWeight: FontWeight.w600,
+                        color: animal.signatureText.withValues(alpha: 0.8),
+                        letterSpacing: 2,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    Text(animal.emoji, style: const TextStyle(fontSize: 44)),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            animal.name,
+                            style: GoogleFonts.playfairDisplay(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w700,
+                              color: animal.signatureText,
+                              letterSpacing: -0.8,
+                              height: 1,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            animal.latinName,
+                            style: GoogleFonts.playfairDisplay(
+                              fontSize: 12,
+                              fontStyle: FontStyle.italic,
+                              color:
+                              animal.signatureText.withValues(alpha: 0.7),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                Container(
+                  height: 1,
+                  color: animal.signatureText.withValues(alpha: 0.2),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  animal.tagline,
+                  style: GoogleFonts.playfairDisplay(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: animal.signatureText,
+                    letterSpacing: -0.3,
+                    height: 1.3,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: animal.traits.map((t) {
+                    return Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: animal.signatureText.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(AppRadius.full),
+                        border: Border.all(
+                          color: animal.signatureText.withValues(alpha: 0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Text(
+                        t,
+                        style: GoogleFonts.inter(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: animal.signatureText,
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 14),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    Text(
+                      '영수증 다시 보기',
+                      style: GoogleFonts.inter(
+                        fontSize: 11,
+                        color: animal.signatureText.withValues(alpha: 0.7),
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      Icons.arrow_forward_rounded,
+                      size: 14,
+                      color: animal.signatureText.withValues(alpha: 0.7),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RadarCard extends StatelessWidget {
+  final PersonaProfile persona;
+  const _RadarCard({required this.persona});
+
+  @override
+  Widget build(BuildContext context) {
     final dimensions = [
-      _Dim('시간 지평', (persona.horizon + 1) / 2, '단기', '장기'),
-      _Dim('현금흐름', (persona.cashflowPreference + 1) / 2, '월급', '보너스'),
-      _Dim('하방 방어', (persona.downsideTolerance + 1) / 2, '방어', '공격'),
-      _Dim('세금', (-persona.taxSensitivity + 1) / 2, '편하게', '회피'),
-      _Dim('유동성', (persona.liquidityNeed + 1) / 2, '필요', '묶어둠'),
-      _Dim('윤리', (-persona.ethicsLooseness + 1) / 2, '느슨', '엄격'),
-      _Dim('분산도', (persona.diversificationDemand + 1) / 2, '집중', '분산'),
-      _Dim('인플레', (persona.inflationHedge + 1) / 2, '약함', '강함'),
+      _Dim('시간', (persona.horizon + 1) / 2),
+      _Dim('현금흐름', (persona.cashflowPreference + 1) / 2),
+      _Dim('하방방어', (persona.downsideTolerance + 1) / 2),
+      _Dim('세금', (-persona.taxSensitivity + 1) / 2),
+      _Dim('유동성', (persona.liquidityNeed + 1) / 2),
+      _Dim('윤리', (-persona.ethicsLooseness + 1) / 2),
+      _Dim('분산', (persona.diversificationDemand + 1) / 2),
+      _Dim('인플레', (persona.inflationHedge + 1) / 2),
     ];
 
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0, end: 1),
-      duration: const Duration(milliseconds: 800),
-      curve: Curves.easeOutCubic,
-      builder: (context, t, _) {
-        return SizedBox(
-          width: 280,
-          height: 280,
-          child: CustomPaint(
-            painter: _RadarPainter(dimensions: dimensions, animation: t),
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: AppColors.border, width: 1),
+      ),
+      child: Column(
+        children: [
+          AspectRatio(
+            aspectRatio: 1.0,
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: 1),
+              duration: const Duration(milliseconds: 800),
+              curve: Curves.easeOutCubic,
+              builder: (context, t, _) {
+                return CustomPaint(
+                  painter: _RadarPainter(
+                    dimensions: dimensions,
+                    animation: t,
+                  ),
+                );
+              },
+            ),
           ),
-        );
-      },
+          const SizedBox(height: 16),
+          Container(height: 1, color: AppColors.borderSoft),
+          const SizedBox(height: 14),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final colWidth = (constraints.maxWidth - 16) / 2;
+              return Wrap(
+                spacing: 16,
+                runSpacing: 10,
+                children: dimensions.map((d) {
+                  return SizedBox(
+                    width: colWidth,
+                    child: _ScoreRow(d: d),
+                  );
+                }).toList(),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ScoreRow extends StatelessWidget {
+  final _Dim d;
+  const _ScoreRow({required this.d});
+
+  @override
+  Widget build(BuildContext context) {
+    final pct = (d.value * 100).round();
+    return Row(
+      children: [
+        Container(
+          width: 4,
+          height: 14,
+          decoration: BoxDecoration(
+            color: AppColors.wine.withValues(alpha: 0.3 + d.value * 0.7),
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            d.label,
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+        Text(
+          '$pct',
+          style: GoogleFonts.inter(
+            fontSize: 12,
+            color: AppColors.wine,
+            fontWeight: FontWeight.w700,
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+        ),
+      ],
     );
   }
 }
 
 class _Dim {
   final String label;
-  final double value; // 0 ~ 1
-  final String low, high;
-  const _Dim(this.label, this.value, this.low, this.high);
+  final double value;
+  const _Dim(this.label, this.value);
 }
 
 class _RadarPainter extends CustomPainter {
@@ -155,12 +468,11 @@ class _RadarPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = math.min(size.width, size.height) / 2 - 32;
+    final radius = math.min(size.width, size.height) / 2 - 44;
     final n = dimensions.length;
 
-    // ── 배경 격자 (4단계)
     final gridPaint = Paint()
-      ..color = AppColors.border
+      ..color = AppColors.borderSoft
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1;
 
@@ -181,9 +493,8 @@ class _RadarPainter extends CustomPainter {
       canvas.drawPath(path, gridPaint);
     }
 
-    // ── 축선
     final axisPaint = Paint()
-      ..color = AppColors.border
+      ..color = AppColors.borderSoft
       ..strokeWidth = 1;
 
     for (int i = 0; i < n; i++) {
@@ -193,7 +504,6 @@ class _RadarPainter extends CustomPainter {
       canvas.drawLine(center, Offset(x, y), axisPaint);
     }
 
-    // ── 데이터 폴리곤 (애니메이션)
     final dataPath = Path();
     final dataPoints = <Offset>[];
 
@@ -212,119 +522,139 @@ class _RadarPainter extends CustomPainter {
     }
     dataPath.close();
 
-    // 채우기
     canvas.drawPath(
       dataPath,
-      Paint()..color = AppColors.accent.withValues(alpha: 0.15),
+      Paint()..color = AppColors.wine.withValues(alpha: 0.18),
     );
-
-    // 외곽선
     canvas.drawPath(
       dataPath,
       Paint()
-        ..color = AppColors.accent
+        ..color = AppColors.wine
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.5,
     );
 
-    // 데이터 포인트 (작은 점)
     for (final p in dataPoints) {
-      canvas.drawCircle(
-        p,
-        2.5,
-        Paint()..color = AppColors.accent,
-      );
+      canvas.drawCircle(p, 3, Paint()..color = AppColors.wine);
     }
 
-    // ── 라벨
-    final labelStyle = const TextStyle(
-      fontSize: 10,
-      fontWeight: FontWeight.w500,
+    // ── 라벨 (각도별 정밀 anchor 정렬)
+    final labelStyle = GoogleFonts.inter(
+      fontSize: 10.5,
+      fontWeight: FontWeight.w600,
       color: AppColors.textSecondary,
-      letterSpacing: -0.1,
+      letterSpacing: 0.1,
     );
 
     for (int i = 0; i < n; i++) {
       final angle = -math.pi / 2 + (2 * math.pi / n) * i;
-      final labelRadius = radius + 18;
-      final x = center.dx + labelRadius * math.cos(angle);
-      final y = center.dy + labelRadius * math.sin(angle);
+      final cosA = math.cos(angle);
+      final sinA = math.sin(angle);
+
+      // 라벨 anchor point (꼭지점 + 8px 패딩)
+      final anchorRadius = radius + 10;
+      final ax = center.dx + anchorRadius * cosA;
+      final ay = center.dy + anchorRadius * sinA;
 
       final tp = TextPainter(
         text: TextSpan(text: dimensions[i].label, style: labelStyle),
         textDirection: TextDirection.ltr,
-        textAlign: TextAlign.center,
       );
       tp.layout();
-      tp.paint(
-        canvas,
-        Offset(x - tp.width / 2, y - tp.height / 2),
-      );
+
+      // 각도별 anchor: 12시(상)/3시(우)/6시(하)/9시(좌) 기준 정밀 배치
+      double dx;
+      double dy;
+
+      if (cosA.abs() < 0.15) {
+        // 거의 수직 (12시 또는 6시)
+        dx = ax - tp.width / 2;
+        dy = sinA < 0 ? ay - tp.height : ay;
+      } else if (cosA > 0) {
+        // 우측 영역: 라벨 좌상단을 anchor에 맞춤
+        dx = ax;
+        dy = ay - tp.height / 2;
+      } else {
+        // 좌측 영역: 라벨 우상단을 anchor에 맞춤
+        dx = ax - tp.width;
+        dy = ay - tp.height / 2;
+      }
+
+      tp.paint(canvas, Offset(dx, dy));
     }
   }
 
   @override
   bool shouldRepaint(covariant _RadarPainter old) =>
-      old.animation != animation || old.dimensions != dimensions;
+      old.animation != animation;
 }
 
-// ═══════════════════════════════════════════════════════════
-//  목표/예산 컴팩트 row
-// ═══════════════════════════════════════════════════════════
-class _GoalsCompact extends StatelessWidget {
+class _GoalsCard extends StatelessWidget {
   final PersonaProfile persona;
-  const _GoalsCompact({required this.persona});
+  const _GoalsCard({required this.persona});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
         border: Border.all(color: AppColors.border, width: 1),
-        borderRadius: BorderRadius.circular(AppRadius.md),
       ),
       child: Column(
         children: [
-          _Row(
+          _GoalRow(
             label: '월 배당 목표',
-            value: formatKRW(persona.monthlyTarget),
+            value: '₩${_fmt(persona.monthlyTarget)}',
           ),
-          Container(height: 1, color: AppColors.border),
-          _Row(
+          Container(height: 1, color: AppColors.borderSoft),
+          _GoalRow(
             label: '투자 예산',
-            value: formatKRW(persona.budget),
+            value: '₩${_fmt(persona.budget)}',
           ),
         ],
       ),
     );
   }
+
+  String _fmt(int v) {
+    final s = v.toString();
+    final buf = StringBuffer();
+    for (int i = 0; i < s.length; i++) {
+      if (i > 0 && (s.length - i) % 3 == 0) buf.write(',');
+      buf.write(s[i]);
+    }
+    return buf.toString();
+  }
 }
 
-class _Row extends StatelessWidget {
+class _GoalRow extends StatelessWidget {
   final String label;
   final String value;
-  const _Row({required this.label, required this.value});
+  const _GoalRow({required this.label, required this.value});
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
             label,
-            style: const TextStyle(
+            style: GoogleFonts.inter(
               fontSize: 13,
               color: AppColors.textSecondary,
             ),
           ),
           Text(
             value,
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
+            style: GoogleFonts.inter(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
               color: AppColors.textPrimary,
               letterSpacing: -0.3,
+              fontFeatures: const [FontFeature.tabularFigures()],
             ),
           ),
         ],
@@ -333,39 +663,73 @@ class _Row extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════
-//  퀴즈 다시 풀기 — 미니멀 ghost 버튼
-// ═══════════════════════════════════════════════════════════
-class _RetakeButton extends StatelessWidget {
+class _ActionTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String subtitle;
   final VoidCallback onTap;
-  const _RetakeButton({required this.onTap});
+
+  const _ActionTile({
+    required this.icon,
+    required this.label,
+    required this.subtitle,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: OutlinedButton.icon(
-        onPressed: onTap,
-        icon: const Icon(
-          Icons.refresh_rounded,
-          size: 16,
-          color: AppColors.textSecondary,
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(AppRadius.md),
+          border: Border.all(color: AppColors.border, width: 1),
         ),
-        label: const Text(
-          '퀴즈 다시 풀기',
-          style: TextStyle(
-            color: AppColors.textSecondary,
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-            letterSpacing: -0.2,
-          ),
-        ),
-        style: OutlinedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(vertical: 14),
-          side: const BorderSide(color: AppColors.border, width: 1),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadius.md),
-          ),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: AppColors.canvas,
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+              ),
+              child: Icon(icon, size: 16, color: AppColors.wine),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: GoogleFonts.inter(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      color: AppColors.textTertiary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(
+              Icons.arrow_forward_ios_rounded,
+              size: 12,
+              color: AppColors.textTertiary,
+            ),
+          ],
         ),
       ),
     );
