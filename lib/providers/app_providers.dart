@@ -7,10 +7,6 @@ import '../services/forecast_engine.dart';
 import '../algorithms/persona_profile.dart';
 import '../algorithms/recommendation_engine.dart';
 
-// ─────────────────────────────────────────
-// PersonaProfile Provider (퀴즈 결과)
-// SharedPreferences에 영구 저장 → 앱 재시작해도 유지
-// ─────────────────────────────────────────
 class PersonaProfileNotifier extends StateNotifier<PersonaProfile?> {
   PersonaProfileNotifier() : super(null) {
     _loadFromDisk();
@@ -38,9 +34,7 @@ class PersonaProfileNotifier extends StateNotifier<PersonaProfile?> {
         preferredSectors: List<String>.from(m['preferredSectors'] ?? []),
         excludedSectors: List<String>.from(m['excludedSectors'] ?? []),
       );
-    } catch (_) {
-      // 파싱 실패하면 무시 (재퀴즈하면 됨)
-    }
+    } catch (_) {}
   }
 
   Future<void> setProfile(PersonaProfile p) async {
@@ -74,9 +68,6 @@ StateNotifierProvider<PersonaProfileNotifier, PersonaProfile?>((ref) {
   return PersonaProfileNotifier();
 });
 
-// ─────────────────────────────────────────
-// 추천 포트폴리오 Provider — 진짜 엔진 연결
-// ─────────────────────────────────────────
 final portfolioRecommendationProvider =
 Provider<PortfolioRecommendation?>((ref) {
   final persona = ref.watch(personaProfileProvider);
@@ -88,15 +79,11 @@ Provider<PortfolioRecommendation?>((ref) {
   );
 });
 
-// 추천 포트폴리오를 Map<StockModel, int>로 변환 (캘린더/예측용)
 final recommendedPortfolioMapProvider = Provider<Map<StockModel, int>>((ref) {
   final rec = ref.watch(portfolioRecommendationProvider);
   return rec?.toMap() ?? {};
 });
 
-// ─────────────────────────────────────────
-// 추천 포트폴리오 미래 예측
-// ─────────────────────────────────────────
 final portfolioForecastProvider = Provider<PortfolioForecast?>((ref) {
   final portfolio = ref.watch(recommendedPortfolioMapProvider);
   if (portfolio.isEmpty) return null;
@@ -106,9 +93,6 @@ final portfolioForecastProvider = Provider<PortfolioForecast?>((ref) {
   );
 });
 
-// ─────────────────────────────────────────
-// 추천 포트폴리오의 월별 배당금 (캘린더용)
-// ─────────────────────────────────────────
 final monthlyDividendCalendarProvider = Provider<List<double>>((ref) {
   final rec = ref.watch(portfolioRecommendationProvider);
   if (rec == null) return List.filled(12, 0.0);

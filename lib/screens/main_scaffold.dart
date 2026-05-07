@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
-import '../widgets/calendar_screen.dart';
+import 'calendar_screen.dart';
 import 'explore_screen.dart';
 import 'home_screen.dart';
 import 'profile_screen.dart';

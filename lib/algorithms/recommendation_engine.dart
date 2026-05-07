@@ -3,7 +3,7 @@ import '../models/stock_model.dart';
 import 'persona_profile.dart';
 
 /// ═══════════════════════════════════════════════════════════
-///  StockTraits — 종목 8차원 벡터
+///  StockTraits — 종목 8차원 벡터 (GICS 11 섹터 대응)
 /// ═══════════════════════════════════════════════════════════
 class StockTraits {
   final double stability;
@@ -56,18 +56,10 @@ class StockTraits {
 
     double freq;
     switch (stock.frequency) {
-      case DividendFrequency.monthly:
-        freq = 1.0;
-        break;
-      case DividendFrequency.quarterly:
-        freq = 0.5;
-        break;
-      case DividendFrequency.semiAnnual:
-        freq = -0.2;
-        break;
-      case DividendFrequency.annual:
-        freq = -0.8;
-        break;
+      case DividendFrequency.monthly:    freq = 1.0;  break;
+      case DividendFrequency.quarterly:  freq = 0.5;  break;
+      case DividendFrequency.semiAnnual: freq = -0.2; break;
+      case DividendFrequency.annual:     freq = -0.8; break;
     }
 
     double vol;
@@ -83,12 +75,13 @@ class StockTraits {
       vol = 0.8;
     }
 
-    double taxEff = stock.name.contains('ETF') ||
+    final isEtf = stock.name.contains('ETF') ||
         stock.name.contains('KODEX') ||
         stock.name.contains('TIGER') ||
-        stock.name.contains('SOL')
-        ? 0.7
-        : -0.3;
+        stock.name.contains('SOL') ||
+        stock.name.contains('ACE') ||
+        stock.name.contains('PLUS');
+    final taxEff = isEtf ? 0.7 : -0.3;
 
     double liq;
     final mc = stock.marketCap;
@@ -107,25 +100,21 @@ class StockTraits {
     final ethics = _ethicsScoreFor(stock.code);
     final sectorId = stock.sector.name;
 
+    // 섹터별 인플레이션 헷지 점수 (GICS 11 sector)
     double inflHedge;
     switch (stock.sector) {
-      case StockSector.reit:
-        inflHedge = 0.85;
-        break;
-      case StockSector.energy:
-        inflHedge = 0.6;
-        break;
-      case StockSector.consumer:
-        inflHedge = 0.3;
-        break;
-      case StockSector.finance:
-        inflHedge = -0.2;
-        break;
-      case StockSector.telecom:
-        inflHedge = -0.1;
-        break;
-      default:
-        inflHedge = 0.0;
+      case StockSector.reit:         inflHedge = 0.85; break;
+      case StockSector.energy:       inflHedge = 0.70; break;
+      case StockSector.materials:    inflHedge = 0.60; break;
+      case StockSector.utilities:    inflHedge = 0.40; break;
+      case StockSector.consumerStpl: inflHedge = 0.30; break;
+      case StockSector.industrial:   inflHedge = 0.10; break;
+      case StockSector.healthcare:   inflHedge = 0.05; break;
+      case StockSector.consumerDisc: inflHedge = 0.00; break;
+      case StockSector.tech:         inflHedge = -0.10; break;
+      case StockSector.telecom:      inflHedge = -0.10; break;
+      case StockSector.finance:      inflHedge = -0.20; break;
+      case StockSector.all:          inflHedge = 0.0;  break;
     }
 
     return StockTraits(
@@ -142,8 +131,9 @@ class StockTraits {
   }
 
   static double _ethicsScoreFor(String code) {
-    const sin = {'033780': 'sin'};
-    if (sin.containsKey(code)) return -0.7;
+    // 담배·주류
+    const sin = {'033780'};
+    if (sin.contains(code)) return -0.7;
     return 0.2;
   }
 
@@ -153,16 +143,13 @@ class StockTraits {
       return true;
     }
     if (profile.excludedSectors.contains('fossil') &&
-        const ['015760', '034020'].contains(code)) {
+        const ['096770', '267250', '015760'].contains(code)) {
       return true;
     }
     return false;
   }
 }
 
-/// ═══════════════════════════════════════════════════════════
-///  PortfolioPick
-/// ═══════════════════════════════════════════════════════════
 class PortfolioPick {
   final StockModel stock;
   final int shares;
@@ -181,33 +168,14 @@ class PortfolioPick {
   });
 }
 
-/// ═══════════════════════════════════════════════════════════
-///  ⭐ NEW: GoalGapAnalysis — 목표 달성 갭 분석
-///  500만원으로 월 20만원 목표 같은 비현실적 케이스를 정직하게 분석
-/// ═══════════════════════════════════════════════════════════
 class GoalGapAnalysis {
-  /// 현재 예산으로 달성 가능한 월 배당
   final int actualMonthly;
-
-  /// 사용자 목표 월 배당
   final int targetMonthly;
-
-  /// 달성률 (0.0 ~ 1.0+)
   final double achievementRate;
-
-  /// 목표를 위해 필요한 총 예산
   final int requiredBudget;
-
-  /// 현재 예산 대비 부족분
   final int budgetGap;
-
-  /// 같은 예산을 N년 적립식으로 모았을 때 시뮬레이션
   final List<MonthlyBuildPlan> buildPlans;
-
-  /// 권장 액션 (3가지 시나리오)
   final List<GoalRecommendation> recommendations;
-
-  /// 갭이 큰지 (목표 달성률 < 50%)
   final bool hasSignificantGap;
 
   const GoalGapAnalysis({
@@ -223,16 +191,9 @@ class GoalGapAnalysis {
 }
 
 class MonthlyBuildPlan {
-  /// 월 적립금 (만원)
   final int monthlyContribution;
-
-  /// 목표 달성까지 소요 개월
   final int monthsToGoal;
-
-  /// 소요 연도
   final double yearsToGoal;
-
-  /// 그 시점 예상 월 배당
   final int expectedMonthlyAtGoal;
 
   const MonthlyBuildPlan({
@@ -258,15 +219,12 @@ class GoalRecommendation {
 }
 
 enum RecommendationType {
-  lowerTarget,    // 목표 낮추기
-  increaseBudget, // 예산 늘리기
-  monthlyBuild,   // 적립식 투자
-  highYield,      // 고배당 종목 비중 ↑
+  lowerTarget,
+  increaseBudget,
+  monthlyBuild,
+  highYield,
 }
 
-/// ═══════════════════════════════════════════════════════════
-///  RecommendationEngine
-/// ═══════════════════════════════════════════════════════════
 class RecommendationEngine {
   static double scoreStock({
     required StockModel stock,
@@ -594,10 +552,6 @@ class RecommendationEngine {
     return sectorWeights.values.fold<double>(0, (a, w) => a + w * w);
   }
 
-  /// ═════════════════════════════════════════════════════
-  ///  ⭐ NEW: 목표 갭 분석
-  ///  500만원 → 월 20만원 같은 케이스를 정직하게 분석
-  /// ═════════════════════════════════════════════════════
   static GoalGapAnalysis analyzeGoalGap({
     required PersonaProfile persona,
     required PortfolioRecommendation rec,
@@ -607,7 +561,6 @@ class RecommendationEngine {
     final achievementRate =
     targetMonthly > 0 ? actualMonthly / targetMonthly : 0.0;
 
-    // 평균 배당수익률 (현재 포트폴리오 기준)
     double avgYield = 0;
     if (rec.picks.isNotEmpty) {
       final totalCost = rec.picks.fold<double>(0, (a, p) => a + p.cost);
@@ -620,20 +573,16 @@ class RecommendationEngine {
             100;
       }
     }
-    if (avgYield <= 0) avgYield = 0.05; // 폴백 5%
+    if (avgYield <= 0) avgYield = 0.05;
 
-    // 목표 달성에 필요한 총 예산: target_monthly * 12 / yield
     final requiredBudget = (targetMonthly * 12 / avgYield).round();
     final budgetGap = requiredBudget - persona.budget;
 
-    // 적립식 시나리오 (3가지: 10만/30만/50만)
     final buildPlans = <MonthlyBuildPlan>[];
     for (final monthly in [100000, 300000, 500000]) {
-      // 단순 적립 (이자 0%): 부족분 ÷ 월 적립금
       final months = budgetGap > 0
           ? (budgetGap / monthly).ceil()
           : 0;
-      // 갈 수 있는 한계: 30년
       if (months > 0 && months <= 360) {
         buildPlans.add(MonthlyBuildPlan(
           monthlyContribution: monthly,
@@ -644,45 +593,39 @@ class RecommendationEngine {
       }
     }
 
-    // 권장 액션
     final recommendations = <GoalRecommendation>[];
 
     if (achievementRate < 0.5) {
-      // 케이스 1: 갭 큼 → 3가지 옵션 제시
-      // 옵션 A: 목표 낮추기 (현실적 목표)
       final realisticTarget = (actualMonthly / 10000).floor() * 10000;
       recommendations.add(GoalRecommendation(
         title: '목표를 ₩${_fmtKrw(realisticTarget)}으로',
         description:
-        '현재 예산으로 달성 가능한 현실적인 목표예요. 도달 후 점진적으로 늘릴 수 있어요',
+        '지금 예산으로 닿을 수 있는 현실적인 숫자. 도달한 후 차근차근 키워가도 늦지 않아요',
         actionLabel: '목표 낮추기',
         type: RecommendationType.lowerTarget,
       ));
 
-      // 옵션 B: 적립식
       if (buildPlans.isNotEmpty) {
-        final mid = buildPlans[1]; // 30만원
+        final mid = buildPlans[1];
         recommendations.add(GoalRecommendation(
-          title: '월 ₩${_fmtKrw(mid.monthlyContribution)} 적립식',
+          title: '월 ₩${_fmtKrw(mid.monthlyContribution)} 적립',
           description:
-          '약 ${mid.yearsToGoal.toStringAsFixed(1)}년 후 목표 도달. 시간이 자산을 익혀줍니다',
+          '약 ${mid.yearsToGoal.toStringAsFixed(1)}년 뒤 목표 도달. 시간이 자산을 익혀줍니다',
           actionLabel: '적립 계획 보기',
           type: RecommendationType.monthlyBuild,
         ));
       }
 
-      // 옵션 C: 예산 늘리기
       recommendations.add(GoalRecommendation(
         title: '추가 ₩${_fmtKrw(budgetGap)} 투자',
-        description: '한 번에 목표 달성. 예산 한도를 늘려 추천을 다시 받아보세요',
+        description: '한 번에 목표에 도달. 예산을 늘리고 추천을 다시 받아보세요',
         actionLabel: '예산 조정',
         type: RecommendationType.increaseBudget,
       ));
     } else if (achievementRate < 0.95) {
-      // 케이스 2: 거의 달성 → 미세 조정
       recommendations.add(GoalRecommendation(
         title: '${(achievementRate * 100).round()}% 달성',
-        description: '거의 다 왔어요. 고배당 ETF 비중을 조금 늘리면 100%에 도달할 수 있어요',
+        description: '목표에 가까워졌어요. 고배당 ETF 비중을 살짝 키우면 100%에 닿아요',
         actionLabel: '고배당 비중 ↑',
         type: RecommendationType.highYield,
       ));
@@ -728,9 +671,6 @@ class _PreliminaryPick {
   });
 }
 
-/// ═══════════════════════════════════════════════════════════
-///  PortfolioRecommendation
-/// ═══════════════════════════════════════════════════════════
 class PortfolioRecommendation {
   final PersonaProfile persona;
   final List<PortfolioPick> picks;
@@ -781,63 +721,57 @@ class PortfolioRecommendation {
 
     if (achievementPct >= 95) {
       reasons.add(
-          '예산 ${formatBudget(p.budget)}으로 목표 월 ${formatBudget(p.monthlyTarget)}을 거의 달성할 수 있어요');
+          '예산 ${formatBudget(p.budget)}으로 목표 월 ${formatBudget(p.monthlyTarget)}에 거의 닿아요');
     } else if (achievementPct >= 60) {
       reasons.add(
-          '현재 예산으로는 월 ${formatBudget(totalMonthlyDividend.round())} (목표의 $achievementPct%) 받을 수 있어요');
+          '지금 예산이면 월 ${formatBudget(totalMonthlyDividend.round())} (목표의 $achievementPct%)');
     } else if (achievementPct >= 30) {
       final neededBudget = (p.budget / (achievementPct / 100)).round();
       reasons.add(
-          '월 ${formatBudget(p.monthlyTarget)} 달성하려면 ${formatBudget(neededBudget)} 필요해요. 현재는 월 ${formatBudget(totalMonthlyDividend.round())} 받을 수 있어요');
+          '월 ${formatBudget(p.monthlyTarget)} 받으려면 ${formatBudget(neededBudget)} 필요. 현재는 월 ${formatBudget(totalMonthlyDividend.round())}');
     } else {
       reasons.add(
-          '지금 예산으로는 월 ${formatBudget(totalMonthlyDividend.round())} 정도예요. 매달 적립식 투자를 추천드려요');
+          '지금 예산으로는 월 ${formatBudget(totalMonthlyDividend.round())}. 매달 적립을 함께 추천해요');
     }
 
     if (p.cashflowPreference < -0.4) {
       if (coveredMonths.length == 12) {
-        reasons.add('1월부터 12월까지 매달 배당이 들어오도록 종목을 조합했어요');
+        reasons.add('1월부터 12월까지 매달 배당이 들어와요');
       } else if (coveredMonths.length >= 9) {
-        reasons.add('${coveredMonths.length}개월 커버 — 거의 매달 배당이 들어와요');
+        reasons.add('${coveredMonths.length}개월 커버. 거의 매달 배당');
       } else {
-        reasons.add(
-            '${coveredMonths.length}개월 커버 (월배당 ETF를 더 추가하면 12개월 커버 가능)');
+        reasons.add('${coveredMonths.length}개월 커버 (월배당 ETF 추가하면 12개월 가능)');
       }
     }
 
     if (p.horizon < -0.3) {
-      reasons.add('단기 목표 달성을 위해 배당수익률 높은 종목을 우선 배치했어요');
+      reasons.add('단기 목표라 배당수익률 높은 종목 위주');
     } else if (p.horizon > 0.3) {
-      reasons.add('긴 시간 지평을 활용해 안정 성장형도 함께 담았어요');
+      reasons.add('긴 시간 활용해 안정 성장형도 함께');
     }
     if (p.downsideTolerance < -0.3) {
-      reasons.add('하방 방어를 위해 변동성 낮은 종목 위주로 골랐어요');
+      reasons.add('하방 방어 위주, 변동성 낮은 종목');
     }
     if (p.diversificationDemand > 0.5) {
-      reasons.add('${picks.length}개 종목으로 섹터를 분산해 리스크를 낮췄어요');
+      reasons.add('${picks.length}개 종목으로 섹터 분산');
     }
     if (p.inflationHedge > 0.4) {
-      reasons.add('인플레이션 방어를 위해 리츠·인프라를 추가했어요');
+      reasons.add('인플레이션 방어용 리츠·인프라 추가');
     }
     if (p.taxSensitivity < -0.3) {
-      reasons.add('종합과세 회피를 위해 분리과세 ETF 비중을 늘렸어요');
+      reasons.add('종합과세 회피 위해 분리과세 ETF 비중 ↑');
     }
     if (p.excludedSectors.isNotEmpty) {
       final excluded = p.excludedSectors.map((s) {
         switch (s) {
-          case 'gambling':
-            return '도박';
-          case 'sin':
-            return '담배·주류';
-          case 'fossil':
-            return '화석연료';
-          case 'defense':
-            return '방산';
-          default:
-            return s;
+          case 'gambling': return '도박';
+          case 'sin':      return '담배·주류';
+          case 'fossil':   return '화석연료';
+          case 'defense':  return '방산';
+          default:         return s;
         }
       }).join(', ');
-      reasons.add('제외 요청 산업($excluded)은 모두 빼고 추천했어요');
+      reasons.add('제외 요청 산업($excluded) 빼고 추천');
     }
     return reasons;
   }

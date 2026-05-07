@@ -6,6 +6,12 @@ import '../algorithms/tax_calculator.dart';
 import '../providers/app_providers.dart';
 import '../theme/app_theme.dart';
 
+/// ═══════════════════════════════════════════════════════════
+///  TaxDetailScreen — 한국 2026 배당세 (분리과세 신설 반영)
+///   • 원천징수 15.4%
+///   • 종합과세 (연 금융소득 2,000만원 초과)
+///   • 2026년 신설: 고배당 분리과세 선택 (조특법 §104의27)
+/// ═══════════════════════════════════════════════════════════
 class TaxDetailScreen extends ConsumerWidget {
   const TaxDetailScreen({super.key});
 
@@ -32,7 +38,6 @@ class TaxDetailScreen extends ConsumerWidget {
           physics: const BouncingScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(24, 8, 24, 100),
           children: [
-            // ── 상단 바
             Row(
               children: [
                 GestureDetector(
@@ -52,16 +57,14 @@ class TaxDetailScreen extends ConsumerWidget {
                 const Spacer(),
               ],
             ),
-
             const SizedBox(height: 20),
 
-            // ── 라벨
             Row(
               children: [
                 Container(width: 24, height: 1.5, color: AppColors.wine),
                 const SizedBox(width: 10),
                 Text(
-                  'TAX BREAKDOWN',
+                  AppCopy.taxLabel,
                   style: GoogleFonts.inter(
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
@@ -73,9 +76,8 @@ class TaxDetailScreen extends ConsumerWidget {
             ).animate().fadeIn(duration: 280.ms),
 
             const SizedBox(height: 12),
-
             Text(
-              '세후 실수령',
+              AppCopy.taxTitle,
               style: GoogleFonts.playfairDisplay(
                 fontSize: 32,
                 fontWeight: FontWeight.w700,
@@ -87,7 +89,7 @@ class TaxDetailScreen extends ConsumerWidget {
 
             const SizedBox(height: 4),
             Text(
-              'After-Tax Income',
+              AppCopy.taxSub,
               style: GoogleFonts.playfairDisplay(
                 fontSize: 13,
                 fontStyle: FontStyle.italic,
@@ -97,16 +99,21 @@ class TaxDetailScreen extends ConsumerWidget {
 
             const SizedBox(height: 24),
 
-            // ── 메인 카드: 세전 vs 세후
             _MainCard(tax: tax)
                 .animate()
                 .fadeIn(delay: 300.ms, duration: 380.ms)
                 .slideY(begin: 0.05),
 
-            const SizedBox(height: 24),
+            // ── 분리 vs 종합 비교 카드 (2026 신설)
+            if (tax.isComprehensiveTaxable) ...[
+              const SizedBox(height: 16),
+              _SeparateVsComprehensiveCard(tax: tax)
+                  .animate()
+                  .fadeIn(delay: 380.ms, duration: 380.ms),
+            ],
 
-            // ── 세금 분해 영수증
-            _SectionLabel(label: 'BREAKDOWN'),
+            const SizedBox(height: 24),
+            _SectionLabel(label: AppCopy.taxBreakdown),
             const SizedBox(height: 12),
             _ReceiptCard(tax: tax)
                 .animate()
@@ -114,16 +121,7 @@ class TaxDetailScreen extends ConsumerWidget {
 
             const SizedBox(height: 24),
 
-            // ── 종합과세 경고
-            if (tax.isComprehensiveTaxable)
-              _ComprehensiveWarning(tax: tax)
-                  .animate()
-                  .fadeIn(delay: 550.ms, duration: 380.ms),
-
-            if (tax.isComprehensiveTaxable) const SizedBox(height: 24),
-
-            // ── 절세 팁
-            _SectionLabel(label: 'TAX SAVING TIPS'),
+            _SectionLabel(label: AppCopy.taxTipsLabel),
             const SizedBox(height: 12),
             ...tax.tips.asMap().entries.map((entry) {
               return Padding(
@@ -140,7 +138,6 @@ class TaxDetailScreen extends ConsumerWidget {
 
             const SizedBox(height: 16),
 
-            // ── 면책 조항
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
@@ -156,7 +153,7 @@ class TaxDetailScreen extends ConsumerWidget {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '이 계산은 일반적 추정치예요. 정확한 세금은 개인 상황(부양가족·의료비·기부금 등)에 따라 달라지므로 세무사 상담을 권장합니다.',
+                      AppCopy.taxDisclaimer,
                       style: GoogleFonts.inter(
                         fontSize: 11,
                         color: AppColors.textTertiary,
@@ -170,10 +167,9 @@ class TaxDetailScreen extends ConsumerWidget {
             ),
 
             const SizedBox(height: 24),
-
             Center(
               child: Text(
-                '· 천천히 익어가는 자산 ·',
+                AppCopy.footerSlow,
                 style: GoogleFonts.playfairDisplay(
                   fontSize: 11,
                   fontStyle: FontStyle.italic,
@@ -194,6 +190,16 @@ class _MainCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isSeparate = tax.isSeparateBetter;
+    final shownNet = isSeparate ? tax.separateNetMonthly : tax.monthlyNet;
+    final shownAnnual =
+    isSeparate ? tax.separateNetAnnual : tax.annualDividendNet;
+    final shownEffective = tax.annualDividendGross > 0
+        ? (isSeparate
+        ? tax.separateTaxAmount / tax.annualDividendGross
+        : tax.effectiveTaxRate)
+        : 0.0;
+
     return Container(
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
@@ -216,7 +222,7 @@ class _MainCard extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Text(
-                'NET MONTHLY',
+                AppCopy.taxNetMonthly,
                 style: GoogleFonts.inter(
                   fontSize: 9,
                   fontWeight: FontWeight.w600,
@@ -224,6 +230,26 @@ class _MainCard extends StatelessWidget {
                   letterSpacing: 2,
                 ),
               ),
+              if (isSeparate) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppColors.gold,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    '분리과세 적용',
+                    style: GoogleFonts.inter(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.wineDeep,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
           const SizedBox(height: 12),
@@ -242,7 +268,7 @@ class _MainCard extends StatelessWidget {
               ),
               const SizedBox(width: 6),
               Text(
-                _fmt(tax.monthlyNet),
+                _fmt(shownNet),
                 style: GoogleFonts.inter(
                   fontSize: 44,
                   fontWeight: FontWeight.w700,
@@ -271,14 +297,14 @@ class _MainCard extends StatelessWidget {
               Expanded(
                 child: _MiniMetric(
                   label: '세금 비율',
-                  value: '${(tax.effectiveTaxRate * 100).toStringAsFixed(1)}%',
+                  value: '${(shownEffective * 100).toStringAsFixed(1)}%',
                   fg: AppColors.surface,
                 ),
               ),
               Expanded(
                 child: _MiniMetric(
                   label: '연 세후',
-                  value: '₩${_fmt(tax.annualDividendNet)}',
+                  value: '₩${_fmt(shownAnnual)}',
                   fg: AppColors.surface,
                   alignEnd: true,
                 ),
@@ -345,6 +371,228 @@ class _MiniMetric extends StatelessWidget {
   }
 }
 
+// ═══════════════════════════════════════════════════════════
+//  분리 vs 종합 비교 (2026 신설 분리과세 안내)
+// ═══════════════════════════════════════════════════════════
+class _SeparateVsComprehensiveCard extends StatelessWidget {
+  final TaxBreakdown tax;
+  const _SeparateVsComprehensiveCard({required this.tax});
+
+  @override
+  Widget build(BuildContext context) {
+    final compNet = tax.annualDividendNet;
+    final sepNet = tax.separateNetAnnual;
+    final saveAmount = (sepNet - compNet).abs();
+    final isSeparateBetter = tax.isSeparateBetter;
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(
+          color: AppColors.gold.withValues(alpha: 0.5),
+          width: 1.5,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding:
+                const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppColors.gold,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Text(
+                  '2026 NEW',
+                  style: GoogleFonts.inter(
+                    fontSize: 9,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.wineDeep,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                AppCopy.taxSeparateTitle,
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            AppCopy.taxSeparateSub,
+            style: GoogleFonts.inter(
+              fontSize: 11,
+              color: AppColors.textSecondary,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // 두 옵션 비교
+          Row(
+            children: [
+              Expanded(
+                child: _CompareTile(
+                  label: '종합과세',
+                  netAnnual: compNet,
+                  taxAmount: tax.totalTax,
+                  rate: tax.effectiveTaxRate,
+                  highlighted: !isSeparateBetter,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _CompareTile(
+                  label: '분리과세',
+                  netAnnual: sepNet,
+                  taxAmount: tax.separateTaxAmount,
+                  rate: tax.annualDividendGross > 0
+                      ? tax.separateTaxAmount / tax.annualDividendGross
+                      : 0,
+                  highlighted: isSeparateBetter,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding:
+            const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.gold.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(AppRadius.sm),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.savings_rounded,
+                    size: 14, color: AppColors.gold),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    isSeparateBetter
+                        ? '분리과세 선택 시 연 ₩${_fmt(saveAmount)} 절세'
+                        : '이 경우엔 종합과세가 더 유리해요',
+                    style: GoogleFonts.inter(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.wineDeep,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _fmt(int v) {
+    if (v >= 100000000) return '${(v / 100000000).toStringAsFixed(1)}억';
+    if (v >= 10000) return '${(v / 10000).toStringAsFixed(0)}만';
+    final s = v.toString();
+    final buf = StringBuffer();
+    for (int i = 0; i < s.length; i++) {
+      if (i > 0 && (s.length - i) % 3 == 0) buf.write(',');
+      buf.write(s[i]);
+    }
+    return buf.toString();
+  }
+}
+
+class _CompareTile extends StatelessWidget {
+  final String label;
+  final int netAnnual;
+  final int taxAmount;
+  final double rate;
+  final bool highlighted;
+
+  const _CompareTile({
+    required this.label,
+    required this.netAnnual,
+    required this.taxAmount,
+    required this.rate,
+    required this.highlighted,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: highlighted ? AppColors.wine : AppColors.surfaceWarm,
+        borderRadius: BorderRadius.circular(AppRadius.sm),
+        border: Border.all(
+          color: highlighted ? AppColors.wine : AppColors.borderSoft,
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 10,
+              fontWeight: FontWeight.w700,
+              color: highlighted
+                  ? AppColors.surface
+                  : AppColors.textTertiary,
+              letterSpacing: 1.0,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '₩${_fmt(netAnnual)}',
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              fontWeight: FontWeight.w800,
+              color: highlighted
+                  ? AppColors.surface
+                  : AppColors.textPrimary,
+              letterSpacing: -0.4,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            '세율 ${(rate * 100).toStringAsFixed(1)}%',
+            style: GoogleFonts.inter(
+              fontSize: 10,
+              color: highlighted
+                  ? AppColors.surface.withValues(alpha: 0.8)
+                  : AppColors.textTertiary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _fmt(int v) {
+    if (v >= 100000000) return '${(v / 100000000).toStringAsFixed(1)}억';
+    if (v >= 10000) return '${(v / 10000).toStringAsFixed(0)}만';
+    final s = v.toString();
+    final buf = StringBuffer();
+    for (int i = 0; i < s.length; i++) {
+      if (i > 0 && (s.length - i) % 3 == 0) buf.write(',');
+      buf.write(s[i]);
+    }
+    return buf.toString();
+  }
+}
+
 class _SectionLabel extends StatelessWidget {
   final String label;
   const _SectionLabel({required this.label});
@@ -392,7 +640,7 @@ class _ReceiptCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(AppRadius.sm),
             ),
             child: Text(
-              'TAX RECEIPT',
+              AppCopy.taxReceiptLabel,
               style: GoogleFonts.inter(
                 fontSize: 10,
                 fontWeight: FontWeight.w700,
@@ -403,21 +651,20 @@ class _ReceiptCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           _ReceiptRow(
-            label: '연 배당 (세전)',
+            label: AppCopy.taxAnnualGross,
             value: '₩${_fmt(tax.annualDividendGross)}',
-            isPositive: true,
           ),
           const SizedBox(height: 8),
           _Dotted(),
           const SizedBox(height: 8),
           _ReceiptRow(
-            label: '원천징수 (15.4%)',
+            label: AppCopy.taxWithholding,
             value: '−₩${_fmt(tax.withholdingTax)}',
             isNegative: true,
           ),
           if (tax.comprehensiveTaxAdditional > 0)
             _ReceiptRow(
-              label: '종합과세 추가분',
+              label: AppCopy.taxComprehensive,
               value: '−₩${_fmt(tax.comprehensiveTaxAdditional)}',
               isNegative: true,
             ),
@@ -427,7 +674,7 @@ class _ReceiptCard extends StatelessWidget {
           Row(
             children: [
               Text(
-                '실수령 (연)',
+                AppCopy.taxNetAnnual,
                 style: GoogleFonts.inter(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
@@ -466,21 +713,18 @@ class _ReceiptCard extends StatelessWidget {
 class _ReceiptRow extends StatelessWidget {
   final String label;
   final String value;
-  final bool isPositive;
   final bool isNegative;
 
   const _ReceiptRow({
     required this.label,
     required this.value,
-    this.isPositive = false,
     this.isNegative = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    Color valueColor = AppColors.textPrimary;
-    if (isNegative) valueColor = AppColors.wine;
-    if (isPositive) valueColor = AppColors.textPrimary;
+    Color valueColor =
+    isNegative ? AppColors.wine : AppColors.textPrimary;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -535,70 +779,6 @@ class _Dotted extends StatelessWidget {
   }
 }
 
-class _ComprehensiveWarning extends StatelessWidget {
-  final TaxBreakdown tax;
-  const _ComprehensiveWarning({required this.tax});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.gold.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(
-          color: AppColors.gold.withValues(alpha: 0.4),
-          width: 1,
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: AppColors.gold.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(AppRadius.sm),
-            ),
-            child: const Icon(
-              Icons.warning_amber_rounded,
-              size: 16,
-              color: AppColors.gold,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '종합과세 대상',
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.gold,
-                    letterSpacing: -0.2,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '연 금융소득 2,000만원 초과로 종합과세 대상이에요. 적용 세율 ${(tax.comprehensiveRate * 100).toStringAsFixed(1)}%',
-                  style: GoogleFonts.inter(
-                    fontSize: 11,
-                    color: AppColors.textSecondary,
-                    height: 1.5,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _TipCard extends StatelessWidget {
   final TaxTip tip;
   const _TipCard({required this.tip});
@@ -607,15 +787,9 @@ class _TipCard extends StatelessWidget {
   Widget build(BuildContext context) {
     Color priorityColor;
     switch (tip.priority) {
-      case TaxTipPriority.high:
-        priorityColor = AppColors.wine;
-        break;
-      case TaxTipPriority.medium:
-        priorityColor = AppColors.gold;
-        break;
-      case TaxTipPriority.low:
-        priorityColor = AppColors.textTertiary;
-        break;
+      case TaxTipPriority.high:   priorityColor = AppColors.wine;          break;
+      case TaxTipPriority.medium: priorityColor = AppColors.gold;          break;
+      case TaxTipPriority.low:    priorityColor = AppColors.textTertiary; break;
     }
 
     return Container(

@@ -7,6 +7,7 @@ import '../algorithms/persona_animal.dart';
 import '../algorithms/persona_profile.dart';
 import '../providers/app_providers.dart';
 import '../theme/app_theme.dart';
+import '../widgets/animal_illustration.dart';
 import 'quiz_result_screen.dart';
 import 'quiz_screen.dart';
 
@@ -24,7 +25,7 @@ class ProfileScreen extends ConsumerWidget {
         child: persona == null
             ? const Center(
           child: Text(
-            '퀴즈를 먼저 완료해주세요',
+            '먼저 퀴즈를 완료해주세요',
             style: TextStyle(color: AppColors.textTertiary),
           ),
         )
@@ -41,24 +42,24 @@ class ProfileScreen extends ConsumerWidget {
                 .fadeIn(delay: 150.ms, duration: 400.ms)
                 .slideY(begin: 0.05),
             const SizedBox(height: 28),
-            const _SectionLabel(label: 'INVESTMENT TRAITS'),
+            const _SectionLabel(label: AppCopy.profileTraits),
             const SizedBox(height: 12),
             _RadarCard(persona: persona)
                 .animate()
                 .fadeIn(delay: 350.ms, duration: 480.ms),
             const SizedBox(height: 28),
-            const _SectionLabel(label: 'GOALS'),
+            const _SectionLabel(label: AppCopy.profileGoals),
             const SizedBox(height: 12),
             _GoalsCard(persona: persona)
                 .animate()
                 .fadeIn(delay: 500.ms, duration: 320.ms),
             const SizedBox(height: 28),
-            const _SectionLabel(label: 'ACTIONS'),
+            const _SectionLabel(label: AppCopy.profileActions),
             const SizedBox(height: 12),
             _ActionTile(
               icon: Icons.refresh_rounded,
-              label: '퀴즈 다시 풀기',
-              subtitle: '투자 본능을 다시 진단',
+              label: AppCopy.profileRetake,
+              subtitle: AppCopy.profileRetakeSub,
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const QuizScreen()),
@@ -67,8 +68,8 @@ class ProfileScreen extends ConsumerWidget {
             const SizedBox(height: 8),
             _ActionTile(
               icon: Icons.receipt_long_rounded,
-              label: '내 영수증 다시 보기',
-              subtitle: '동물 페르소나와 추천 결과',
+              label: AppCopy.profileReceipt,
+              subtitle: '동물 카드와 추천 결과',
               onTap: () => Navigator.push(
                 context,
                 MaterialPageRoute(
@@ -78,14 +79,14 @@ class ProfileScreen extends ConsumerWidget {
             const SizedBox(height: 8),
             _ActionTile(
               icon: Icons.info_outline_rounded,
-              label: '배당나무 정보',
-              subtitle: '버전 1.0.0',
+              label: AppCopy.profileAppInfo,
+              subtitle: 'v1.0.0',
               onTap: () {},
             ).animate().fadeIn(delay: 700.ms, duration: 320.ms),
             const SizedBox(height: 32),
             Center(
               child: Text(
-                '· 천천히 익어가는 자산 ·',
+                AppCopy.footerSlow,
                 style: GoogleFonts.playfairDisplay(
                   fontSize: 11,
                   fontStyle: FontStyle.italic,
@@ -109,7 +110,7 @@ class _Header extends StatelessWidget {
         Container(width: 24, height: 1.5, color: AppColors.wine),
         const SizedBox(width: 10),
         Text(
-          'YOUR PROFILE',
+          AppCopy.profileLabel,
           style: GoogleFonts.inter(
             fontSize: 10,
             fontWeight: FontWeight.w600,
@@ -206,14 +207,26 @@ class _AnimalCard extends StatelessWidget {
         ),
         child: Stack(
           children: [
-            Positioned(
-              right: -20,
-              top: -20,
+            // 워터마크 grid
+            Positioned.fill(
               child: Opacity(
-                opacity: 0.12,
-                child: Text(
-                  animal.emoji,
-                  style: const TextStyle(fontSize: 160),
+                opacity: 0.05,
+                child: CustomPaint(painter: _GridPainter(color: animal.illustrationInk)),
+              ),
+            ),
+            // 우상단 mini animal (B&W)
+            Positioned(
+              right: -6,
+              top: -6,
+              child: Opacity(
+                opacity: 0.18,
+                child: SizedBox(
+                  width: 110,
+                  height: 110,
+                  child: AnimalIllustration(
+                    illustrationId: animal.illustrationId,
+                    ink: animal.illustrationInk,
+                  ),
                 ),
               ),
             ),
@@ -229,7 +242,7 @@ class _AnimalCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      'YOUR INVESTMENT SPIRIT',
+                      AppCopy.personaSpiritLabel,
                       style: GoogleFonts.inter(
                         fontSize: 9,
                         fontWeight: FontWeight.w600,
@@ -242,7 +255,14 @@ class _AnimalCard extends StatelessWidget {
                 const SizedBox(height: 14),
                 Row(
                   children: [
-                    Text(animal.emoji, style: const TextStyle(fontSize: 44)),
+                    SizedBox(
+                      width: 60,
+                      height: 60,
+                      child: AnimalIllustration(
+                        illustrationId: animal.illustrationId,
+                        ink: animal.signatureText,
+                      ),
+                    ),
                     const SizedBox(width: 14),
                     Expanded(
                       child: Column(
@@ -264,8 +284,7 @@ class _AnimalCard extends StatelessWidget {
                             style: GoogleFonts.playfairDisplay(
                               fontSize: 12,
                               fontStyle: FontStyle.italic,
-                              color:
-                              animal.signatureText.withValues(alpha: 0.7),
+                              color: animal.signatureText.withValues(alpha: 0.7),
                             ),
                           ),
                         ],
@@ -321,7 +340,7 @@ class _AnimalCard extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     Text(
-                      '영수증 다시 보기',
+                      AppCopy.profileReceipt,
                       style: GoogleFonts.inter(
                         fontSize: 11,
                         color: animal.signatureText.withValues(alpha: 0.7),
@@ -343,6 +362,28 @@ class _AnimalCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _GridPainter extends CustomPainter {
+  final Color color;
+  _GridPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1;
+    const step = 18.0;
+    for (double x = 0; x < size.width; x += step) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), paint);
+    }
+    for (double y = 0; y < size.height; y += step) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_) => false;
 }
 
 class _RadarCard extends StatelessWidget {
@@ -538,7 +579,6 @@ class _RadarPainter extends CustomPainter {
       canvas.drawCircle(p, 3, Paint()..color = AppColors.wine);
     }
 
-    // ── 라벨 (각도별 정밀 anchor 정렬)
     final labelStyle = GoogleFonts.inter(
       fontSize: 10.5,
       fontWeight: FontWeight.w600,
@@ -551,7 +591,6 @@ class _RadarPainter extends CustomPainter {
       final cosA = math.cos(angle);
       final sinA = math.sin(angle);
 
-      // 라벨 anchor point (꼭지점 + 8px 패딩)
       final anchorRadius = radius + 10;
       final ax = center.dx + anchorRadius * cosA;
       final ay = center.dy + anchorRadius * sinA;
@@ -562,20 +601,16 @@ class _RadarPainter extends CustomPainter {
       );
       tp.layout();
 
-      // 각도별 anchor: 12시(상)/3시(우)/6시(하)/9시(좌) 기준 정밀 배치
       double dx;
       double dy;
 
       if (cosA.abs() < 0.15) {
-        // 거의 수직 (12시 또는 6시)
         dx = ax - tp.width / 2;
         dy = sinA < 0 ? ay - tp.height : ay;
       } else if (cosA > 0) {
-        // 우측 영역: 라벨 좌상단을 anchor에 맞춤
         dx = ax;
         dy = ay - tp.height / 2;
       } else {
-        // 좌측 영역: 라벨 우상단을 anchor에 맞춤
         dx = ax - tp.width;
         dy = ay - tp.height / 2;
       }
@@ -604,12 +639,12 @@ class _GoalsCard extends StatelessWidget {
       child: Column(
         children: [
           _GoalRow(
-            label: '월 배당 목표',
+            label: AppCopy.quizMonthlyLbl,
             value: '₩${_fmt(persona.monthlyTarget)}',
           ),
           Container(height: 1, color: AppColors.borderSoft),
           _GoalRow(
-            label: '투자 예산',
+            label: AppCopy.quizBudgetLbl,
             value: '₩${_fmt(persona.budget)}',
           ),
         ],

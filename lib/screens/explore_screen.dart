@@ -8,9 +8,9 @@ import '../theme/app_theme.dart';
 import 'sector_detail_screen.dart';
 
 /// ═══════════════════════════════════════════════════════════
-///  ExploreScreen — 박물관 동물 도감
-///   8개 섹터를 시그니처 컬러 카드로 진열
-///   각 카드는 거대한 타이포 + 종목 수 + → 화살표
+///  ExploreScreen v2 — GICS 11개 섹터 도감
+///   ▸ 평균 수익률은 시총 가중 평균 + 0배당 종목 제외
+///   ▸ 단순 평균이 만들어낸 34070% 같은 이상치 방지
 /// ═══════════════════════════════════════════════════════════
 class ExploreScreen extends ConsumerWidget {
   const ExploreScreen({super.key});
@@ -19,16 +19,26 @@ class ExploreScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final allStocks = StockDataService.allStocks;
 
-    // 섹터별 종목 그룹핑
     final sectorGroups = <StockSector, List<StockModel>>{};
     for (final s in allStocks) {
       if (s.sector == StockSector.all) continue;
       sectorGroups.putIfAbsent(s.sector, () => []).add(s);
     }
 
-    final sectors = StockSector.values
-        .where((s) => s != StockSector.all)
-        .toList();
+    // GICS 11개 섹터 표시 순서 (Energy → Real Estate)
+    const orderedSectors = [
+      StockSector.energy,
+      StockSector.materials,
+      StockSector.industrial,
+      StockSector.consumerDisc,
+      StockSector.consumerStpl,
+      StockSector.healthcare,
+      StockSector.finance,
+      StockSector.tech,
+      StockSector.telecom,
+      StockSector.utilities,
+      StockSector.reit,
+    ];
 
     return Scaffold(
       backgroundColor: AppColors.canvas,
@@ -37,24 +47,20 @@ class ExploreScreen extends ConsumerWidget {
         child: CustomScrollView(
           physics: const BouncingScrollPhysics(),
           slivers: [
-            // ─── 헤더
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // 작은 라벨
                     Row(
                       children: [
                         Container(
-                          width: 24,
-                          height: 1.5,
-                          color: AppColors.wine,
+                          width: 24, height: 1.5, color: AppColors.wine,
                         ),
                         const SizedBox(width: 10),
                         Text(
-                          'EXPLORE',
+                          AppCopy.exploreLabel,
                           style: GoogleFonts.inter(
                             fontSize: 10,
                             fontWeight: FontWeight.w600,
@@ -64,12 +70,9 @@ class ExploreScreen extends ConsumerWidget {
                         ),
                       ],
                     ).animate().fadeIn(duration: 280.ms),
-
                     const SizedBox(height: 14),
-
-                    // 거대한 헤드라인 (Serif)
                     Text(
-                      '섹터 도감',
+                      AppCopy.exploreTitle,
                       style: GoogleFonts.playfairDisplay(
                         fontSize: 38,
                         fontWeight: FontWeight.w700,
@@ -81,12 +84,9 @@ class ExploreScreen extends ConsumerWidget {
                         .animate()
                         .fadeIn(delay: 100.ms, duration: 320.ms)
                         .slideY(begin: 0.05, end: 0),
-
                     const SizedBox(height: 6),
-
-                    // 부제목 (italic)
                     Text(
-                      'Sectorum Compendium',
+                      AppCopy.exploreSub,
                       style: GoogleFonts.playfairDisplay(
                         fontSize: 14,
                         fontStyle: FontStyle.italic,
@@ -94,14 +94,11 @@ class ExploreScreen extends ConsumerWidget {
                         letterSpacing: 0.3,
                       ),
                     ).animate().fadeIn(delay: 200.ms, duration: 320.ms),
-
                     const SizedBox(height: 12),
-
-                    // 메타 정보
                     Row(
                       children: [
                         Text(
-                          '${sectors.length}개 섹터',
+                          '${orderedSectors.length}개 섹터',
                           style: GoogleFonts.inter(
                             fontSize: 12,
                             color: AppColors.textSecondary,
@@ -109,8 +106,7 @@ class ExploreScreen extends ConsumerWidget {
                         ),
                         const SizedBox(width: 8),
                         Container(
-                          width: 3,
-                          height: 3,
+                          width: 3, height: 3,
                           decoration: BoxDecoration(
                             color: AppColors.textTertiary,
                             borderRadius: BorderRadius.circular(2),
@@ -130,8 +126,6 @@ class ExploreScreen extends ConsumerWidget {
                 ),
               ),
             ),
-
-            // ─── 섹터 카드 그리드 (2 columns)
             SliverPadding(
               padding: const EdgeInsets.fromLTRB(24, 0, 24, 100),
               sliver: SliverGrid(
@@ -143,7 +137,7 @@ class ExploreScreen extends ConsumerWidget {
                 ),
                 delegate: SliverChildBuilderDelegate(
                       (context, i) {
-                    final sector = sectors[i];
+                    final sector = orderedSectors[i];
                     final stocks = sectorGroups[sector] ?? [];
                     return _SectorCard(
                       sector: sector,
@@ -158,7 +152,7 @@ class ExploreScreen extends ConsumerWidget {
                     )
                         .slideY(begin: 0.08, end: 0);
                   },
-                  childCount: sectors.length,
+                  childCount: orderedSectors.length,
                 ),
               ),
             ),
@@ -170,9 +164,7 @@ class ExploreScreen extends ConsumerWidget {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  섹터 카드 — Image 2 + 4 영감
-//   거대한 타이포 + 시그니처 컬러 풀 배경
-//   하단 → 화살표
+//  Sector Card
 // ═══════════════════════════════════════════════════════════
 class _SectorCard extends StatelessWidget {
   final StockSector sector;
@@ -187,15 +179,33 @@ class _SectorCard extends StatelessWidget {
     required this.indexNumber,
   });
 
+  /// ⭐ 시총 가중 평균 + 0배당 종목 제외
+  /// 단순 평균은 0% + 100%를 50%로 보여줘서 왜곡 큼
+  double _calculateAvgYield() {
+    final paying = stocks.where((s) => s.dividendYield > 0).toList();
+    if (paying.isEmpty) return 0.0;
+
+    // 시총 합
+    final totalCap = paying.fold<int>(0, (a, b) => a + b.marketCap);
+    if (totalCap <= 0) {
+      // 시총 데이터 없으면 단순 평균
+      return paying.map((s) => s.dividendYield).reduce((a, b) => a + b) /
+          paying.length;
+    }
+
+    // 시총 가중 평균
+    double weighted = 0;
+    for (final s in paying) {
+      weighted += s.dividendYield * (s.marketCap / totalCap);
+    }
+    // 비현실적 이상치 클립 (한국 시장 실제 평균 ~2-7%)
+    return weighted.clamp(0, 99).toDouble();
+  }
+
   @override
   Widget build(BuildContext context) {
     final palette = AppColors.paletteFor(sector.name);
-
-    // 평균 배당수익률
-    final avgYield = stocks.isEmpty
-        ? 0.0
-        : stocks.map((s) => s.dividendYield).reduce((a, b) => a + b) /
-        stocks.length;
+    final avgYield = _calculateAvgYield();
 
     return GestureDetector(
       onTap: () => Navigator.push(
@@ -214,26 +224,29 @@ class _SectorCard extends StatelessWidget {
         ),
         child: Stack(
           children: [
-            // 백그라운드 워터마크 (큰 emoji 살짝)
+            // 백그라운드: 거대한 영문 라벨이 흐리게
             Positioned(
-              right: -16,
-              top: -16,
+              right: -8,
+              bottom: -16,
               child: Opacity(
-                opacity: 0.1,
+                opacity: 0.07,
                 child: Text(
-                  sector.emoji,
-                  style: const TextStyle(fontSize: 110),
+                  palette.label.split(' ').first,
+                  style: GoogleFonts.inter(
+                    fontSize: 90,
+                    fontWeight: FontWeight.w900,
+                    color: palette.onBg,
+                    letterSpacing: -4,
+                    height: 0.85,
+                  ),
                 ),
               ),
             ),
-
-            // 콘텐츠
             Padding(
               padding: const EdgeInsets.all(14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ── 상단: 인덱스 번호 + 라틴 라벨
                   Row(
                     children: [
                       Text(
@@ -247,40 +260,38 @@ class _SectorCard extends StatelessWidget {
                       ),
                       const SizedBox(width: 6),
                       Container(
-                        width: 12,
-                        height: 1,
+                        width: 12, height: 1,
                         color: palette.onBg.withValues(alpha: 0.4),
                       ),
                       const SizedBox(width: 6),
-                      Text(
-                        palette.label,
-                        style: GoogleFonts.inter(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w600,
-                          color: palette.onBg.withValues(alpha: 0.7),
-                          letterSpacing: 1.2,
+                      Expanded(
+                        child: Text(
+                          palette.label,
+                          style: GoogleFonts.inter(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w600,
+                            color: palette.onBg.withValues(alpha: 0.7),
+                            letterSpacing: 1.2,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
                   ),
-
                   const Spacer(),
-
-                  // ── 거대한 한글 이름 (Serif)
                   Text(
                     sector.label,
                     style: GoogleFonts.playfairDisplay(
-                      fontSize: 32,
+                      fontSize: 30,
                       fontWeight: FontWeight.w700,
                       color: palette.onBg,
-                      letterSpacing: -1.2,
+                      letterSpacing: -1,
                       height: 1.0,
                     ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
                   ),
-
                   const SizedBox(height: 4),
-
-                  // 영문 sub
                   Text(
                     palette.label.toLowerCase(),
                     style: GoogleFonts.inter(
@@ -289,11 +300,9 @@ class _SectorCard extends StatelessWidget {
                       color: palette.onBg.withValues(alpha: 0.6),
                       letterSpacing: 0.2,
                     ),
+                    overflow: TextOverflow.ellipsis,
                   ),
-
                   const SizedBox(height: 14),
-
-                  // ── 메트릭 (영수증 스타일)
                   Container(
                     height: 1,
                     color: palette.onBg.withValues(alpha: 0.2),
@@ -307,18 +316,16 @@ class _SectorCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   _MetricRow(
                     label: '평균 수익률',
-                    value: '${avgYield.toStringAsFixed(1)}%',
+                    value: avgYield > 0
+                        ? '${avgYield.toStringAsFixed(2)}%'
+                        : '—',
                     color: palette.onBg,
                   ),
-
                   const SizedBox(height: 12),
-
-                  // ── 하단: → 화살표 (Image 4 영감)
                   Align(
                     alignment: Alignment.centerRight,
                     child: Container(
-                      width: 32,
-                      height: 32,
+                      width: 32, height: 32,
                       decoration: BoxDecoration(
                         color: palette.onBg.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(AppRadius.full),

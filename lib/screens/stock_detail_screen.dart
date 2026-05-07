@@ -22,14 +22,12 @@ class StockDetailScreen extends ConsumerWidget {
         child: CustomScrollView(
           physics: const BouncingScrollPhysics(),
           slivers: [
-            // ── 상단 영역
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // 뒤로가기 + 섹터 칩
                     Row(
                       children: [
                         GestureDetector(
@@ -41,14 +39,11 @@ class StockDetailScreen extends ConsumerWidget {
                               color: AppColors.surface,
                               borderRadius:
                               BorderRadius.circular(AppRadius.full),
-                              border:
-                              Border.all(color: AppColors.border, width: 1),
+                              border: Border.all(
+                                  color: AppColors.border, width: 1),
                             ),
-                            child: const Icon(
-                              Icons.arrow_back_rounded,
-                              size: 16,
-                              color: AppColors.textPrimary,
-                            ),
+                            child: const Icon(Icons.arrow_back_rounded,
+                                size: 16, color: AppColors.textPrimary),
                           ),
                         ),
                         const Spacer(),
@@ -60,37 +55,27 @@ class StockDetailScreen extends ConsumerWidget {
                             borderRadius:
                             BorderRadius.circular(AppRadius.full),
                           ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(stock.sector.emoji,
-                                  style: const TextStyle(fontSize: 11)),
-                              const SizedBox(width: 5),
-                              Text(
-                                palette.label,
-                                style: GoogleFonts.inter(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w700,
-                                  color: palette.onBg,
-                                  letterSpacing: 1.2,
-                                ),
-                              ),
-                            ],
+                          child: Text(
+                            palette.label,
+                            style: GoogleFonts.inter(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                              color: palette.onBg,
+                              letterSpacing: 1.2,
+                            ),
                           ),
                         ),
                       ],
                     ),
-
                     const SizedBox(height: 24),
 
-                    // 작은 라벨
                     Row(
                       children: [
                         Container(
                             width: 18, height: 1, color: AppColors.wine),
                         const SizedBox(width: 6),
                         Text(
-                          'STOCK',
+                          AppCopy.stockLabel,
                           style: GoogleFonts.inter(
                             fontSize: 9,
                             fontWeight: FontWeight.w600,
@@ -111,8 +96,6 @@ class StockDetailScreen extends ConsumerWidget {
                     ).animate().fadeIn(duration: 280.ms),
 
                     const SizedBox(height: 8),
-
-                    // 거대한 이름 (Serif)
                     Text(
                       stock.name,
                       style: GoogleFonts.playfairDisplay(
@@ -139,7 +122,6 @@ class StockDetailScreen extends ConsumerWidget {
 
                     const SizedBox(height: 24),
 
-                    // 가격 + 수익률 메트릭
                     Container(
                       padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
@@ -155,7 +137,7 @@ class StockDetailScreen extends ConsumerWidget {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'PRICE',
+                                  AppCopy.stockPrice,
                                   style: GoogleFonts.inter(
                                     fontSize: 9,
                                     fontWeight: FontWeight.w600,
@@ -189,7 +171,7 @@ class StockDetailScreen extends ConsumerWidget {
                               crossAxisAlignment: CrossAxisAlignment.end,
                               children: [
                                 Text(
-                                  'YIELD',
+                                  AppCopy.stockYield,
                                   style: GoogleFonts.inter(
                                     fontSize: 9,
                                     fontWeight: FontWeight.w600,
@@ -217,7 +199,6 @@ class StockDetailScreen extends ConsumerWidget {
 
                     const SizedBox(height: 16),
 
-                    // 작은 메트릭 박스 4개 (영수증 스타일)
                     Row(
                       children: [
                         _SmallMetric(label: 'PER', value: '${stock.per}'),
@@ -236,7 +217,6 @@ class StockDetailScreen extends ConsumerWidget {
               ),
             ),
 
-            // ── 차트
             if (stock.history.isNotEmpty)
               SliverToBoxAdapter(
                 child: Padding(
@@ -254,7 +234,7 @@ class StockDetailScreen extends ConsumerWidget {
                         Row(
                           children: [
                             Text(
-                              'DIVIDEND HISTORY',
+                              AppCopy.stockHistory,
                               style: GoogleFonts.inter(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w600,
@@ -264,10 +244,12 @@ class StockDetailScreen extends ConsumerWidget {
                             ),
                             const Spacer(),
                             _LegendDot(
-                                color: AppColors.wine, label: '실제'),
+                                color: AppColors.wine,
+                                label: AppCopy.stockHistoryReal),
                             const SizedBox(width: 8),
                             _LegendDot(
-                                color: AppColors.gold, label: '예측'),
+                                color: AppColors.gold,
+                                label: AppCopy.stockHistoryEst),
                           ],
                         ),
                         const SizedBox(height: 16),
@@ -282,7 +264,6 @@ class StockDetailScreen extends ConsumerWidget {
                 ).animate().fadeIn(delay: 400.ms, duration: 380.ms),
               ),
 
-            // ── 연도별 영수증
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
@@ -304,7 +285,7 @@ class StockDetailScreen extends ConsumerWidget {
                           borderRadius: BorderRadius.circular(AppRadius.sm),
                         ),
                         child: Text(
-                          'YEARLY RECORD',
+                          AppCopy.stockYearly,
                           style: GoogleFonts.inter(
                             fontSize: 10,
                             fontWeight: FontWeight.w700,
@@ -403,10 +384,7 @@ class _LegendDot extends StatelessWidget {
         Container(
           width: 6,
           height: 6,
-          decoration: BoxDecoration(
-            color: color,
-            shape: BoxShape.circle,
-          ),
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
         ),
         const SizedBox(width: 4),
         Text(
@@ -521,8 +499,7 @@ class _YearRow extends StatelessWidget {
         children: [
           if (isPredicted)
             Container(
-              padding:
-              const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               margin: const EdgeInsets.only(right: 8),
               decoration: BoxDecoration(
                 color: AppColors.gold.withValues(alpha: 0.15),

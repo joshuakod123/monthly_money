@@ -4,14 +4,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/stock_model.dart';
 
 /// ═══════════════════════════════════════════════════════════
-///  StockDataService v6 — Supabase backed
+///  StockDataService v7 — Supabase + GICS 11 sector mapping
 /// ═══════════════════════════════════════════════════════════
 class StockDataService {
   StockDataService._();
   static final instance = StockDataService._();
 
-  static const _cacheKey = 'stocks_cache_v1';
-  static const _cacheTimeKey = 'stocks_cache_time_v1';
+  static const _cacheKey = 'stocks_cache_v2';
+  static const _cacheTimeKey = 'stocks_cache_time_v2';
   static const _cacheTtl = Duration(hours: 24);
 
   List<StockModel> _stocks = [];
@@ -19,15 +19,11 @@ class StockDataService {
 
   Future<void> init() async {
     if (_initialized) return;
-
-    // 1) 로컬 캐시 우선 (앱 시작 빠름)
     final cached = await _loadFromCache();
     if (cached.isNotEmpty) {
       _stocks = cached;
       _initialized = true;
     }
-
-    // 2) Supabase에서 최신 데이터 (백그라운드)
     await _refreshIfStale();
   }
 
@@ -125,30 +121,51 @@ class StockDataService {
     );
   }
 
+  /// Supabase의 sector 컬럼을 GICS 11 enum으로 매핑
+  /// 구버전 데이터 (consumer 단일) 호환을 위해 fallback도 처리
   static StockSector _parseSector(String? s) {
     switch (s) {
-      case 'finance': return StockSector.finance;
-      case 'telecom': return StockSector.telecom;
-      case 'energy': return StockSector.energy;
-      case 'reit': return StockSector.reit;
-      case 'consumer': return StockSector.consumer;
-      case 'industrial': return StockSector.industrial;
-      case 'healthcare': return StockSector.healthcare;
-      default: return StockSector.industrial;
+      case 'energy':       return StockSector.energy;
+      case 'materials':    return StockSector.materials;
+      case 'industrial':   return StockSector.industrial;
+      case 'consumerDisc':
+      case 'consumer_disc':
+      case 'consumerDiscretionary':
+        return StockSector.consumerDisc;
+      case 'consumerStpl':
+      case 'consumer_stpl':
+      case 'consumerStaples':
+      case 'consumer':     // 구 데이터 호환 — 필수소비재로 분류
+        return StockSector.consumerStpl;
+      case 'healthcare':   return StockSector.healthcare;
+      case 'finance':      return StockSector.finance;
+      case 'tech':
+      case 'it':
+      case 'technology':
+        return StockSector.tech;
+      case 'telecom':
+      case 'comm':
+      case 'communication':
+        return StockSector.telecom;
+      case 'utilities':    return StockSector.utilities;
+      case 'reit':
+      case 'realestate':
+      case 'real_estate':
+        return StockSector.reit;
+      default:             return StockSector.industrial;
     }
   }
 
   static DividendFrequency _parseFrequency(String? s) {
     switch (s) {
-      case 'monthly': return DividendFrequency.monthly;
-      case 'quarterly': return DividendFrequency.quarterly;
+      case 'monthly':    return DividendFrequency.monthly;
+      case 'quarterly':  return DividendFrequency.quarterly;
       case 'semiAnnual': return DividendFrequency.semiAnnual;
-      case 'annual': return DividendFrequency.annual;
-      default: return DividendFrequency.annual;
+      case 'annual':     return DividendFrequency.annual;
+      default:           return DividendFrequency.annual;
     }
   }
 
-  // 정적 호환 API (기존 코드 안 깨짐)
   static List<StockModel> get allStocks => instance._stocks;
 
   static List<StockModel> getBySector(StockSector sector) {

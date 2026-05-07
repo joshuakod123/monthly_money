@@ -31,13 +31,12 @@ class _WelcomeScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 상단: 작은 라벨
               Row(
                 children: [
                   Container(width: 32, height: 1.5, color: AppColors.wine),
                   const SizedBox(width: 10),
                   Text(
-                    'EST. 2026',
+                    AppCopy.onboardingEst,
                     style: GoogleFonts.inter(
                       fontSize: 10,
                       fontWeight: FontWeight.w600,
@@ -50,9 +49,8 @@ class _WelcomeScreen extends StatelessWidget {
 
               const Spacer(flex: 2),
 
-              // 로고/심볼
               Text(
-                '※',
+                AppCopy.brandSymbol,
                 style: GoogleFonts.playfairDisplay(
                   fontSize: 80,
                   color: AppColors.wine,
@@ -62,9 +60,8 @@ class _WelcomeScreen extends StatelessWidget {
 
               const SizedBox(height: 24),
 
-              // 메인 헤드라인
               Text(
-                '배당나무',
+                AppCopy.brandKo,
                 style: GoogleFonts.playfairDisplay(
                   fontSize: 56,
                   fontWeight: FontWeight.w700,
@@ -80,7 +77,7 @@ class _WelcomeScreen extends StatelessWidget {
               const SizedBox(height: 12),
 
               Text(
-                'Baedang Namu',
+                AppCopy.brandEn,
                 style: GoogleFonts.playfairDisplay(
                   fontSize: 16,
                   fontStyle: FontStyle.italic,
@@ -91,7 +88,6 @@ class _WelcomeScreen extends StatelessWidget {
 
               const SizedBox(height: 40),
 
-              // 설명
               Container(
                 width: 32,
                 height: 1,
@@ -101,7 +97,7 @@ class _WelcomeScreen extends StatelessWidget {
               const SizedBox(height: 20),
 
               Text(
-                '8가지 질문으로\n당신의 투자 본능을\n발견합니다',
+                AppCopy.onboardingHeadline,
                 style: GoogleFonts.playfairDisplay(
                   fontSize: 22,
                   fontWeight: FontWeight.w500,
@@ -117,7 +113,7 @@ class _WelcomeScreen extends StatelessWidget {
               const SizedBox(height: 12),
 
               Text(
-                '시간이 당신의 자산을 익혀줍니다',
+                AppCopy.footerSlow.replaceAll('·', '').trim(),
                 style: GoogleFonts.inter(
                   fontSize: 13,
                   color: AppColors.textTertiary,
@@ -128,7 +124,6 @@ class _WelcomeScreen extends StatelessWidget {
 
               const Spacer(flex: 3),
 
-              // CTA
               SizedBox(
                 width: double.infinity,
                 child: GestureDetector(
@@ -149,7 +144,7 @@ class _WelcomeScreen extends StatelessWidget {
                       children: [
                         const SizedBox(width: 24),
                         Text(
-                          '시작하기',
+                          AppCopy.onboardingCta,
                           style: GoogleFonts.inter(
                             fontSize: 15,
                             fontWeight: FontWeight.w700,
@@ -182,7 +177,7 @@ class _WelcomeScreen extends StatelessWidget {
 
               Center(
                 child: Text(
-                  '· 약 2분 소요 ·',
+                  '· ${AppCopy.onboardingSub} ·',
                   style: GoogleFonts.playfairDisplay(
                     fontSize: 11,
                     fontStyle: FontStyle.italic,

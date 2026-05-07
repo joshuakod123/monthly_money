@@ -1,19 +1,47 @@
 import 'package:flutter/material.dart';
 
+/// ═══════════════════════════════════════════════════════════
+///  StockSector — GICS 11개 표준 섹터 + all
+///
+///  GICS (Global Industry Classification Standard) 기반:
+///   1) Energy       에너지     (정유·가스·석탄)
+///   2) Materials    소재       (화학·철강·비철금속)
+///   3) Industrials  산업재     (기계·건설·운송·항공·방산)
+///   4) ConsumerDisc 경기소비재 (자동차·의류·여행·미디어 일부)
+///   5) ConsumerStpl 필수소비재 (식품·생활용품·담배·주류)
+///   6) HealthCare   헬스케어   (제약·바이오·의료기기)
+///   7) Financials   금융       (은행·증권·보험)
+///   8) IT           IT         (반도체·SW·HW)
+///   9) CommSvc      커뮤니케이션(통신·미디어·엔터)
+///  10) Utilities    유틸리티   (전력·수도·가스공급)
+///  11) RealEstate   부동산     (REIT·부동산개발)
+/// ═══════════════════════════════════════════════════════════
 enum StockSector {
-  all('전체', '🌿', Color(0xFF8E8E93)),
-  finance('금융', '🏦', Color(0xFF4A6FA5)),
-  telecom('통신', '📡', Color(0xFF6B5B95)),
-  energy('에너지', '⚡', Color(0xFFE8A33D)),
-  reit('리츠', '🏢', Color(0xFF7BA098)),
-  consumer('소비재', '🛒', Color(0xFFC97B63)),
-  industrial('산업재', '🔧', Color(0xFF5A6E7C)),
-  healthcare('헬스케어', '💊', Color(0xFFB85C7A));
+  all('전체', '전체', 'ALL', Color(0xFF8E8E93)),
+  energy('에너지', '에너지', 'ENERGY', Color(0xFF1F2E47)),
+  materials('소재', '소재', 'MATERIALS', Color(0xFF7A5C3D)),
+  industrial('산업재', '산업재', 'INDUSTRIALS', Color(0xFF555A5C)),
+  consumerDisc('경기소비재', '경기소비재', 'CONSUMER DISC.', Color(0xFFB8542F)),
+  consumerStpl('필수소비재', '필수소비재', 'CONSUMER STAPLES', Color(0xFFC9A227)),
+  healthcare('헬스케어', '헬스케어', 'HEALTH CARE', Color(0xFFE8B5BE)),
+  finance('금융', '금융', 'FINANCIALS', Color(0xFF722F37)),
+  tech('IT', 'IT', 'INFO TECH', Color(0xFF3D5A7A)),
+  telecom('커뮤니케이션', '커뮤니케이션', 'COMM. SVC.', Color(0xFF6B5B95)),
+  utilities('유틸리티', '유틸리티', 'UTILITIES', Color(0xFF6B7A5F)),
+  reit('부동산', '리츠·부동산', 'REAL ESTATE', Color(0xFFA85962));
 
-  const StockSector(this.label, this.emoji, this.defaultColor);
+  const StockSector(this.label, this.fullLabel, this.englishLabel, this.defaultColor);
+
+  /// 짧은 한글 라벨
   final String label;
-  final String emoji;
+  /// 풀 한글 라벨
+  final String fullLabel;
+  /// 영문 라벨 (display용)
+  final String englishLabel;
   final Color defaultColor;
+
+  /// 더 이상 emoji 안 씀 — 시그니처 컬러 + 큰 영문 타이포로 구분
+  String get emoji => '';
 }
 
 enum InvestmentProfile {
@@ -47,7 +75,7 @@ class StockModel {
   final int dividendPerShare;
   final int latestDividend;
   final DividendFrequency frequency;
-  final List<int> paymentMonths; // 👈 캘린더를 위한 배당 지급월 추가
+  final List<int> paymentMonths;
   final double per;
   final double pbr;
   final double roe;
@@ -69,7 +97,7 @@ class StockModel {
     this.dividendPerShare = 0,
     this.latestDividend = 0,
     required this.frequency,
-    required this.paymentMonths, // 필수
+    required this.paymentMonths,
     this.per = 0,
     this.pbr = 0,
     this.roe = 0,
@@ -107,15 +135,14 @@ class StockModel {
     );
   }
 
-  // 기존: 목표 달성률 확인을 위한 '월평균' (Average)
   double monthlyDividend(int shares) {
     final perShare = dividendPerShare > 0 ? dividendPerShare : latestDividend;
     return (perShare * shares) / 12;
   }
+
   double dividendForMonth(int shares, int month) {
     final perShare = dividendPerShare > 0 ? dividendPerShare : latestDividend;
     if (perShare == 0 || !paymentMonths.contains(month)) return 0;
-    // 한 번 지급할 때 들어오는 금액 = 연간 / 지급 횟수
     return (perShare / paymentMonths.length) * shares;
   }
 
@@ -133,7 +160,13 @@ class DividendHistory {
   final bool isPaid;
   final DateTime? exDate;
 
-  const DividendHistory({required this.year, required this.amount, this.yieldPercent = 0, this.isPaid = true, this.exDate});
+  const DividendHistory({
+    required this.year,
+    required this.amount,
+    this.yieldPercent = 0,
+    this.isPaid = true,
+    this.exDate,
+  });
 }
 
 class PortfolioItem {
@@ -141,21 +174,26 @@ class PortfolioItem {
   final int shares;
   final double avgPrice;
 
-  const PortfolioItem({required this.stock, required this.shares, required this.avgPrice});
+  const PortfolioItem({
+    required this.stock,
+    required this.shares,
+    required this.avgPrice,
+  });
 
   double get totalValue => stock.price * shares;
   double get totalCost => avgPrice * shares;
   double get gainLoss => totalValue - totalCost;
-  double get gainLossPct => totalCost == 0 ? 0 : ((totalValue - totalCost) / totalCost) * 100;
+  double get gainLossPct =>
+      totalCost == 0 ? 0 : ((totalValue - totalCost) / totalCost) * 100;
 
-  // 평균 기준
   double get monthlyDividend => stock.monthlyDividend(shares);
   double get annualDividend => monthlyDividend * 12;
 
-  // 👈 캘린더용 실제 지급월 기준 계산
   double getActualDividendForMonth(int month) {
     if (stock.paymentMonths.contains(month)) {
-      final annualPerShare = stock.dividendPerShare > 0 ? stock.dividendPerShare : stock.latestDividend;
+      final annualPerShare = stock.dividendPerShare > 0
+          ? stock.dividendPerShare
+          : stock.latestDividend;
       return (annualPerShare / stock.paymentMonths.length) * shares;
     }
     return 0.0;
@@ -168,5 +206,10 @@ class UserGoal {
   final List<StockSector> preferredSectors;
   final int investmentBudget;
 
-  const UserGoal({required this.monthlyTarget, required this.profile, required this.preferredSectors, required this.investmentBudget});
+  const UserGoal({
+    required this.monthlyTarget,
+    required this.profile,
+    required this.preferredSectors,
+    required this.investmentBudget,
+  });
 }

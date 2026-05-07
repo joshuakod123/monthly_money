@@ -6,8 +6,8 @@ import '../theme/app_theme.dart';
 import 'stock_detail_screen.dart';
 
 /// ═══════════════════════════════════════════════════════════
-///  SectorDetailScreen — Image 4 영감
-///   상단: 섹터 시그니처 컬러 풀스크린
+///  SectorDetailScreen
+///   상단: 섹터 시그니처 컬러 풀스크린 + 거대 영문 타이포
 ///   하단: Dutch White 시트 + 종목 리스트
 /// ═══════════════════════════════════════════════════════════
 class SectorDetailScreen extends StatefulWidget {
@@ -50,14 +50,10 @@ class _SectorDetailScreenState extends State<SectorDetailScreen> {
 
   String get _sortLabel {
     switch (_sort) {
-      case _SortMode.yieldDesc:
-        return '수익률 높은 순';
-      case _SortMode.yieldAsc:
-        return '수익률 낮은 순';
-      case _SortMode.marketCap:
-        return '시총 큰 순';
-      case _SortMode.name:
-        return '이름 가나다순';
+      case _SortMode.yieldDesc: return '수익률 ↓';
+      case _SortMode.yieldAsc:  return '수익률 ↑';
+      case _SortMode.marketCap: return '시총 큰 순';
+      case _SortMode.name:      return '가나다순';
     }
   }
 
@@ -111,11 +107,8 @@ class _SectorDetailScreenState extends State<SectorDetailScreen> {
                     ),
                   ),
                   trailing: selected
-                      ? const Icon(
-                    Icons.check_rounded,
-                    color: AppColors.wine,
-                    size: 18,
-                  )
+                      ? const Icon(Icons.check_rounded,
+                      color: AppColors.wine, size: 18)
                       : null,
                   onTap: () {
                     setState(() => _sort = mode);
@@ -132,14 +125,10 @@ class _SectorDetailScreenState extends State<SectorDetailScreen> {
 
   String _sortLabelFor(_SortMode m) {
     switch (m) {
-      case _SortMode.yieldDesc:
-        return '수익률 높은 순';
-      case _SortMode.yieldAsc:
-        return '수익률 낮은 순';
-      case _SortMode.marketCap:
-        return '시총 큰 순';
-      case _SortMode.name:
-        return '이름 가나다순';
+      case _SortMode.yieldDesc: return '수익률 높은 순';
+      case _SortMode.yieldAsc:  return '수익률 낮은 순';
+      case _SortMode.marketCap: return '시총 큰 순';
+      case _SortMode.name:      return '이름 가나다순';
     }
   }
 
@@ -148,12 +137,7 @@ class _SectorDetailScreenState extends State<SectorDetailScreen> {
     final palette = AppColors.paletteFor(widget.sector.name);
     final sorted = _sortedStocks;
 
-    final avgYield = widget.stocks.isEmpty
-        ? 0.0
-        : widget.stocks
-        .map((s) => s.dividendYield)
-        .reduce((a, b) => a + b) /
-        widget.stocks.length;
+    final avgYield = _weightedAvgYield(widget.stocks);
 
     return Scaffold(
       backgroundColor: palette.bg,
@@ -161,7 +145,6 @@ class _SectorDetailScreenState extends State<SectorDetailScreen> {
         bottom: false,
         child: Column(
           children: [
-            // ─── 상단 컬러 영역 (40%)
             _ColorHero(
               palette: palette,
               sector: widget.sector,
@@ -169,8 +152,6 @@ class _SectorDetailScreenState extends State<SectorDetailScreen> {
               avgYield: avgYield,
               onBack: () => Navigator.pop(context),
             ),
-
-            // ─── 하단 시트 (60%)
             Expanded(
               child: _StockListSheet(
                 stocks: sorted,
@@ -183,11 +164,30 @@ class _SectorDetailScreenState extends State<SectorDetailScreen> {
       ),
     );
   }
+
+  /// 시총 가중 평균 + 0배당 제외 + 클립 (explore_screen과 동일 방식)
+  double _weightedAvgYield(List<StockModel> stocks) {
+    final positive =
+    stocks.where((s) => s.dividendYield > 0 && s.dividendYield < 99).toList();
+    if (positive.isEmpty) return 0.0;
+
+    double totalCap = 0;
+    double weightedSum = 0;
+    for (final s in positive) {
+      final w = s.marketCap > 0 ? s.marketCap.toDouble() : 1.0;
+      totalCap += w;
+      weightedSum += s.dividendYield * w;
+    }
+    if (totalCap == 0) {
+      final mean =
+          positive.map((s) => s.dividendYield).reduce((a, b) => a + b) /
+              positive.length;
+      return mean.clamp(0.0, 99.0);
+    }
+    return (weightedSum / totalCap).clamp(0.0, 99.0);
+  }
 }
 
-// ═══════════════════════════════════════════════════════════
-//  컬러 헤로 영역
-// ═══════════════════════════════════════════════════════════
 class _ColorHero extends StatelessWidget {
   final SectorPalette palette;
   final StockSector sector;
@@ -211,15 +211,21 @@ class _ColorHero extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
       child: Stack(
         children: [
-          // 워터마크 emoji
+          // 거대 영문 워터마크 (오른쪽 cropped)
           Positioned(
-            right: -30,
-            top: 30,
+            right: -20,
+            top: 60,
             child: Opacity(
-              opacity: 0.08,
+              opacity: 0.07,
               child: Text(
-                sector.emoji,
-                style: const TextStyle(fontSize: 220),
+                palette.label.split(' ').first,
+                style: GoogleFonts.inter(
+                  fontSize: 220,
+                  fontWeight: FontWeight.w900,
+                  color: fg,
+                  letterSpacing: -8,
+                  height: 0.85,
+                ),
               ),
             ),
           ),
@@ -227,7 +233,6 @@ class _ColorHero extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── 상단 바: 뒤로가기 + 인덱스
               Row(
                 children: [
                   GestureDetector(
@@ -243,11 +248,8 @@ class _ColorHero extends StatelessWidget {
                           width: 1,
                         ),
                       ),
-                      child: Icon(
-                        Icons.arrow_back_rounded,
-                        size: 18,
-                        color: fg,
-                      ),
+                      child: Icon(Icons.arrow_back_rounded,
+                          size: 18, color: fg),
                     ),
                   ),
                   const Spacer(),
@@ -258,21 +260,14 @@ class _ColorHero extends StatelessWidget {
                       color: fg.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(AppRadius.full),
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(sector.emoji, style: const TextStyle(fontSize: 12)),
-                        const SizedBox(width: 6),
-                        Text(
-                          palette.label,
-                          style: GoogleFonts.inter(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: fg,
-                            letterSpacing: 1.2,
-                          ),
-                        ),
-                      ],
+                    child: Text(
+                      palette.label,
+                      style: GoogleFonts.inter(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: fg,
+                        letterSpacing: 1.2,
+                      ),
                     ),
                   ),
                 ],
@@ -280,7 +275,6 @@ class _ColorHero extends StatelessWidget {
 
               const SizedBox(height: 32),
 
-              // ── 거대한 영문 이름 (Sans display, Image 2 영감)
               Text(
                 palette.label,
                 style: GoogleFonts.inter(
@@ -297,7 +291,6 @@ class _ColorHero extends StatelessWidget {
 
               const SizedBox(height: 8),
 
-              // ── 한글 이름 (Serif)
               Row(
                 children: [
                   Text(
@@ -332,7 +325,6 @@ class _ColorHero extends StatelessWidget {
 
               const SizedBox(height: 24),
 
-              // ── 메트릭 박스 (Image 4의 박스 영감)
               Row(
                 children: [
                   Expanded(
@@ -378,10 +370,7 @@ class _MetricBox extends StatelessWidget {
       decoration: BoxDecoration(
         color: fg.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(AppRadius.md),
-        border: Border.all(
-          color: fg.withValues(alpha: 0.25),
-          width: 1,
-        ),
+        border: Border.all(color: fg.withValues(alpha: 0.25), width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -412,9 +401,6 @@ class _MetricBox extends StatelessWidget {
   }
 }
 
-// ═══════════════════════════════════════════════════════════
-//  하단 화이트 시트 — 종목 리스트
-// ═══════════════════════════════════════════════════════════
 class _StockListSheet extends StatelessWidget {
   final List<StockModel> stocks;
   final String sortLabel;
@@ -432,13 +418,11 @@ class _StockListSheet extends StatelessWidget {
       width: double.infinity,
       decoration: const BoxDecoration(
         color: AppColors.canvas,
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(AppRadius.xl),
-        ),
+        borderRadius:
+        BorderRadius.vertical(top: Radius.circular(AppRadius.xl)),
       ),
       child: Column(
         children: [
-          // ── 손잡이
           Container(
             margin: const EdgeInsets.only(top: 10),
             width: 36,
@@ -448,10 +432,7 @@ class _StockListSheet extends StatelessWidget {
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-
           const SizedBox(height: 12),
-
-          // ── 헤더 + 정렬
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
             child: Row(
@@ -478,7 +459,7 @@ class _StockListSheet extends StatelessWidget {
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.tune_rounded,
+                        const Icon(Icons.tune_rounded,
                             size: 12, color: AppColors.textSecondary),
                         const SizedBox(width: 5),
                         Text(
@@ -496,8 +477,6 @@ class _StockListSheet extends StatelessWidget {
               ],
             ),
           ),
-
-          // ── 리스트
           Expanded(
             child: ListView.builder(
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
@@ -538,6 +517,8 @@ class _StockRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final palette = AppColors.paletteFor(stock.sector.name);
+
     return GestureDetector(
       onTap: () => Navigator.push(
         context,
@@ -555,7 +536,6 @@ class _StockRow extends StatelessWidget {
         ),
         child: Row(
           children: [
-            // 인덱스 (영수증 라인 번호)
             SizedBox(
               width: 24,
               child: Text(
@@ -568,10 +548,16 @@ class _StockRow extends StatelessWidget {
                 ),
               ),
             ),
-
-            const SizedBox(width: 8),
-
-            // 이름 + 메타
+            const SizedBox(width: 6),
+            Container(
+              width: 4,
+              height: 32,
+              decoration: BoxDecoration(
+                color: palette.bg,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -597,10 +583,7 @@ class _StockRow extends StatelessWidget {
                 ],
               ),
             ),
-
             const SizedBox(width: 10),
-
-            // 우측: 가격 + 수익률
             Column(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
@@ -621,7 +604,6 @@ class _StockRow extends StatelessWidget {
                     fontSize: 11,
                     color: AppColors.wine,
                     fontWeight: FontWeight.w700,
-                    letterSpacing: -0.1,
                   ),
                 ),
               ],

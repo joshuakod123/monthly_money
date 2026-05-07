@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -7,12 +8,12 @@ import '../algorithms/persona_profile.dart';
 import '../algorithms/recommendation_engine.dart';
 import '../providers/app_providers.dart';
 import '../theme/app_theme.dart';
+import '../widgets/animal_illustration.dart';
 
 /// ═══════════════════════════════════════════════════════════
-///  QuizResultScreen — 2단계 결과 (PageView)
-///   페이지 1: 동물 페르소나 (Image 2 스타일)
-///   페이지 2: 영수증 (Image 1 스타일)
-///   완료 시 홈으로 이동 (퀴즈 결과 저장됨)
+///  QuizResultScreen v2 — Image 3 ANIMAL PLANET 영감
+///   페이지 1: 풀스크린 컬러 + 거대 픽셀풍 타이포 + 흑백 동물
+///   페이지 2: 영수증
 /// ═══════════════════════════════════════════════════════════
 class QuizResultScreen extends ConsumerStatefulWidget {
   const QuizResultScreen({super.key});
@@ -39,7 +40,6 @@ class _QuizResultScreenState extends ConsumerState<QuizResultScreen> {
       );
       setState(() => _page = 1);
     } else {
-      // 영수증 confirm → 홈으로
       Navigator.of(context).popUntil((route) => route.isFirst);
     }
   }
@@ -67,7 +67,6 @@ class _QuizResultScreenState extends ConsumerState<QuizResultScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // ── 상단 바 (페이지 인디케이터 + retake)
             _TopBar(
               page: _page,
               total: 2,
@@ -75,29 +74,20 @@ class _QuizResultScreenState extends ConsumerState<QuizResultScreen> {
               isFirstPage: _page == 0,
               onRetake: _retake,
             ),
-
-            // ── 콘텐츠
             Expanded(
               child: PageView(
                 controller: _pc,
                 physics: const NeverScrollableScrollPhysics(),
                 children: [
-                  _AnimalPage(animal: animal, persona: persona),
-                  _ReceiptPage(
-                    persona: persona,
-                    rec: rec,
-                    animal: animal,
-                  ),
+                  _AnimalPosterPage(animal: animal),
+                  _ReceiptPage(persona: persona, rec: rec, animal: animal),
                 ],
               ),
             ),
-
-            // ── 하단 CTA
             _BottomCta(
               page: _page,
               animal: animal,
               onNext: _next,
-              onRetake: _retake,
             ),
           ],
         ),
@@ -107,7 +97,7 @@ class _QuizResultScreenState extends ConsumerState<QuizResultScreen> {
 }
 
 // ═══════════════════════════════════════════════════════════
-// 상단 바
+//  Top Bar
 // ═══════════════════════════════════════════════════════════
 class _TopBar extends StatelessWidget {
   final int page;
@@ -131,29 +121,25 @@ class _TopBar extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
       child: Row(
         children: [
-          // 페이지 인디케이터 (1/2)
+          // 인덱스 (Image 3 좌상단 4/10 스타일)
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: fg.withValues(alpha: 0.12),
+              color: isFirstPage ? fg.withValues(alpha: 0.18) : Colors.transparent,
               borderRadius: BorderRadius.circular(AppRadius.full),
-              border: Border.all(
-                color: fg.withValues(alpha: 0.3),
-                width: 1,
-              ),
+              border: Border.all(color: fg.withValues(alpha: 0.4), width: 1),
             ),
             child: Text(
-              '${page + 1} / $total',
-              style: GoogleFonts.inter(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
+              '${animal.index} / 8',
+              style: GoogleFonts.spaceMono(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
                 color: fg,
                 letterSpacing: 0.5,
               ),
             ),
           ),
           const Spacer(),
-          // 다시 풀기
           GestureDetector(
             onTap: onRetake,
             child: Padding(
@@ -166,7 +152,7 @@ class _TopBar extends StatelessWidget {
                     '다시',
                     style: GoogleFonts.inter(
                       fontSize: 12,
-                      fontWeight: FontWeight.w500,
+                      fontWeight: FontWeight.w600,
                       color: fg,
                     ),
                   ),
@@ -181,185 +167,240 @@ class _TopBar extends StatelessWidget {
 }
 
 // ═══════════════════════════════════════════════════════════
-//  [Page 1] 동물 페르소나 페이지 (Image 2 영감)
-//  - 거대한 동물 이름 (Sans display, 음수 tracking)
-//  - 동물 이모지를 거대하게 중앙 배치
-//  - 시그니처 배경 + 동물 위 latin name 작게
+//  ⭐ Page 1: ANIMAL PLANET 스타일 포스터
+//   Image 3 영감 — 강한 컬러 풀배경 + 거대 픽셀풍 타이포
+//   + 흑백 동물 일러스트 + 사이드 'Discover' 텍스트
 // ═══════════════════════════════════════════════════════════
-class _AnimalPage extends StatelessWidget {
+class _AnimalPosterPage extends StatelessWidget {
   final PersonaAnimal animal;
-  final PersonaProfile persona;
-
-  const _AnimalPage({required this.animal, required this.persona});
+  const _AnimalPosterPage({required this.animal});
 
   @override
   Widget build(BuildContext context) {
-    final fg = animal.signatureText;
-    final accent = animal.signatureBg == AppColors.wine
-        ? AppColors.wineSoft
-        : fg.withValues(alpha: 0.7);
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 12),
-
-          // ── 라벨
-          Row(
-            children: [
-              Container(width: 20, height: 1.5, color: fg),
-              const SizedBox(width: 8),
-              Text(
-                'YOUR INVESTMENT SPIRIT',
-                style: GoogleFonts.inter(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
-                  color: fg,
-                  letterSpacing: 2,
-                ),
-              ),
-            ],
-          ).animate().fadeIn(duration: 400.ms),
-
-          const SizedBox(height: 24),
-
-          // ── 거대한 이름 (Sans display)
-          Text(
-            animal.name.toUpperCase(),
-            style: GoogleFonts.inter(
-              fontSize: 80,
-              fontWeight: FontWeight.w800,
-              color: fg,
-              letterSpacing: -4,
-              height: 0.95,
+    return Stack(
+      children: [
+        // ── 바둑판 배경 패턴 (Image 3 텍스처)
+        Positioned.fill(
+          child: CustomPaint(
+            painter: _GridBackgroundPainter(
+              color: animal.signatureText.withValues(alpha: 0.06),
             ),
-          )
-              .animate()
-              .fadeIn(delay: 200.ms, duration: 600.ms)
-              .slideY(begin: 0.05, end: 0),
+          ),
+        ),
 
-          const SizedBox(height: 8),
-
-          // ── Latin name (작게, italic)
-          Text(
-            animal.latinName,
-            style: GoogleFonts.playfairDisplay(
-              fontSize: 16,
-              fontStyle: FontStyle.italic,
-              color: accent,
-              letterSpacing: 0.3,
-            ),
-          ).animate().fadeIn(delay: 500.ms, duration: 400.ms),
-
-          const SizedBox(height: 32),
-
-          // ── 거대한 이모지 (중앙)
-          Expanded(
-            child: Center(
-              child: Stack(
-                alignment: Alignment.center,
+        // ── 거대 타이포가 화면 위에서 쪼개지는 듯한 레이아웃
+        // 이름을 두 줄로 자르거나 한 줄로 — 글자 길이에 따라
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+          child: LayoutBuilder(
+            builder: (context, c) {
+              return Stack(
                 children: [
-                  // 백그라운드 텍스처
-                  Opacity(
-                    opacity: 0.05,
-                    child: Text(
-                      animal.archetype,
-                      style: GoogleFonts.playfairDisplay(
-                        fontSize: 180,
-                        fontWeight: FontWeight.w900,
-                        color: fg,
+                  // 거대 타이포
+                  Positioned(
+                    left: 0, right: 0, top: 0,
+                    child: _GiantStackedName(
+                      name: animal.displayName,
+                      color: animal.signatureText,
+                      maxWidth: c.maxWidth,
+                    )
+                        .animate()
+                        .fadeIn(delay: 100.ms, duration: 500.ms)
+                        .slideY(begin: -0.05, end: 0),
+                  ),
+
+                  // 동물 일러스트 (중앙)
+                  Positioned.fill(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 80),
+                      child: Center(
+                        child: AnimalIllustration(
+                          illustrationId: animal.illustrationId,
+                          ink: animal.illustrationInk,
+                          size: math.min(c.maxWidth * 0.85, c.maxHeight * 0.55),
+                        )
+                            .animate()
+                            .fadeIn(delay: 400.ms, duration: 800.ms)
+                            .scale(begin: const Offset(0.9, 0.9)),
                       ),
                     ),
                   ),
-                  Text(
-                    animal.emoji,
-                    style: const TextStyle(fontSize: 200),
-                  )
-                      .animate()
-                      .fadeIn(delay: 600.ms, duration: 800.ms)
-                      .scale(begin: const Offset(0.7, 0.7))
-                      .then()
-                      .shimmer(
-                    duration: 2400.ms,
-                    color: fg.withValues(alpha: 0.3),
+
+                  // ── 좌측 세로 'Discover' (Image 3 영감)
+                  Positioned(
+                    left: 0,
+                    top: c.maxHeight * 0.45,
+                    child: RotatedBox(
+                      quarterTurns: 3,
+                      child: Text(
+                        'Discover',
+                        style: GoogleFonts.playfairDisplay(
+                          fontSize: 18,
+                          fontStyle: FontStyle.italic,
+                          fontWeight: FontWeight.w500,
+                          color: animal.signatureText.withValues(alpha: 0.85),
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ).animate().fadeIn(delay: 600.ms),
+                  ),
+
+                  // ── 하단: 한글 이름 + 설명
+                  Positioned(
+                    left: 0, right: 0, bottom: 8,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          animal.name,
+                          style: GoogleFonts.playfairDisplay(
+                            fontSize: 32,
+                            fontWeight: FontWeight.w700,
+                            color: animal.signatureText,
+                            letterSpacing: -1,
+                            height: 1,
+                          ),
+                        )
+                            .animate()
+                            .fadeIn(delay: 700.ms, duration: 400.ms),
+                        const SizedBox(height: 4),
+                        Text(
+                          animal.latinName,
+                          style: GoogleFonts.playfairDisplay(
+                            fontSize: 13,
+                            fontStyle: FontStyle.italic,
+                            color: animal.signatureText.withValues(alpha: 0.7),
+                          ),
+                        ).animate().fadeIn(delay: 800.ms),
+                        const SizedBox(height: 14),
+                        Text(
+                          animal.tagline,
+                          style: GoogleFonts.inter(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: animal.signatureText,
+                            height: 1.4,
+                          ),
+                        ).animate().fadeIn(delay: 900.ms),
+                        const SizedBox(height: 8),
+                        Text(
+                          animal.description,
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: animal.signatureText.withValues(alpha: 0.85),
+                            height: 1.5,
+                          ),
+                        ).animate().fadeIn(delay: 1000.ms),
+                      ],
+                    ),
                   ),
                 ],
-              ),
-            ),
-          ),
-
-          // ── 태그라인 (Serif)
-          Text(
-            animal.tagline,
-            style: GoogleFonts.playfairDisplay(
-              fontSize: 22,
-              fontWeight: FontWeight.w600,
-              color: fg,
-              letterSpacing: -0.4,
-              height: 1.3,
-            ),
-          )
-              .animate()
-              .fadeIn(delay: 900.ms, duration: 480.ms)
-              .slideY(begin: 0.1, end: 0),
-
-          const SizedBox(height: 12),
-
-          // ── 설명 (작게)
-          Text(
-            animal.description,
-            style: GoogleFonts.inter(
-              fontSize: 13,
-              fontWeight: FontWeight.w400,
-              color: fg.withValues(alpha: 0.85),
-              height: 1.55,
-            ),
-          ).animate().fadeIn(delay: 1100.ms, duration: 400.ms),
-
-          const SizedBox(height: 20),
-
-          // ── Traits 키워드 (3개 칩)
-          Wrap(
-            spacing: 8,
-            children: animal.traits.map((t) {
-              return Container(
-                padding:
-                const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: fg.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(AppRadius.full),
-                  border: Border.all(
-                    color: fg.withValues(alpha: 0.3),
-                    width: 1,
-                  ),
-                ),
-                child: Text(
-                  t,
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: fg,
-                    letterSpacing: -0.1,
-                  ),
-                ),
               );
-            }).toList(),
-          ).animate().fadeIn(delay: 1300.ms, duration: 400.ms),
-
-          const SizedBox(height: 20),
-        ],
-      ),
+            },
+          ),
+        ),
+      ],
     );
   }
 }
 
 // ═══════════════════════════════════════════════════════════
-//  [Page 2] 영수증 페이지 (Image 1 영감)
-//   - 점선 라운드 박스
-//   - DETAILS 라벨 (오렌지/와인)
-//   - 페르소나 + 목표 + 추천 종목 리스트
+//  거대 이름 (Image 3 처럼 두 줄로 쌓기)
+//   ANI / MAL / PLA / NET 처럼 분할해서 거대하게
+// ═══════════════════════════════════════════════════════════
+class _GiantStackedName extends StatelessWidget {
+  final String name;
+  final Color color;
+  final double maxWidth;
+  const _GiantStackedName({
+    required this.name,
+    required this.color,
+    required this.maxWidth,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // 길이에 따라 한 줄/두 줄 결정
+    // 짧으면 (≤5자) 한 줄, 길면 반으로 쪼개기
+    final pieces = _split(name);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: pieces.map((p) {
+        return _PixelGiantText(
+          text: p,
+          color: color,
+          maxWidth: maxWidth,
+        );
+      }).toList(),
+    );
+  }
+
+  List<String> _split(String s) {
+    if (s.length <= 5) return [s];
+    final mid = (s.length / 2).ceil();
+    return [s.substring(0, mid), s.substring(mid)];
+  }
+}
+
+class _PixelGiantText extends StatelessWidget {
+  final String text;
+  final Color color;
+  final double maxWidth;
+  const _PixelGiantText({
+    required this.text,
+    required this.color,
+    required this.maxWidth,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // 글자 수에 비례해 폰트크기 자동 조정 (전 폭을 채움)
+    // 평균 너비 ~ fontSize × 0.55 (Inter Black 기준)
+    final fontSize = (maxWidth / (text.length * 0.55))
+        .clamp(64.0, 130.0).toDouble();
+
+    return SizedBox(
+      width: maxWidth,
+      child: Text(
+        text,
+        style: GoogleFonts.inter(
+          fontSize: fontSize,
+          fontWeight: FontWeight.w900,
+          color: color,
+          letterSpacing: -fontSize * 0.06,
+          height: 0.85,
+        ),
+      ),
+    );
+  }
+}
+
+// 격자 배경
+class _GridBackgroundPainter extends CustomPainter {
+  final Color color;
+  _GridBackgroundPainter({required this.color});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final p = Paint()
+      ..color = color
+      ..strokeWidth = 1;
+    const cell = 14.0;
+    for (double x = 0; x <= size.width; x += cell) {
+      canvas.drawLine(Offset(x, 0), Offset(x, size.height), p);
+    }
+    for (double y = 0; y <= size.height; y += cell) {
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), p);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _GridBackgroundPainter old) => old.color != color;
+}
+
+// ═══════════════════════════════════════════════════════════
+//  Page 2: 영수증 (기존 디자인 유지)
 // ═══════════════════════════════════════════════════════════
 class _ReceiptPage extends StatelessWidget {
   final PersonaProfile persona;
@@ -380,13 +421,13 @@ class _ReceiptPage extends StatelessWidget {
         : 0;
 
     final dt = DateTime.now();
-    final dateStr = '${dt.year}.${dt.month.toString().padLeft(2, '0')}.${dt.day.toString().padLeft(2, '0')}';
+    final dateStr =
+        '${dt.year}.${dt.month.toString().padLeft(2, '0')}.${dt.day.toString().padLeft(2, '0')}';
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
       physics: const BouncingScrollPhysics(),
       children: [
-        // ── 영수증 카드
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
@@ -397,7 +438,6 @@ class _ReceiptPage extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── DETAILS 라벨 (Image 1의 오렌지 박스 → wine)
               Container(
                 padding: const EdgeInsets.symmetric(
                     horizontal: 10, vertical: 5),
@@ -406,7 +446,7 @@ class _ReceiptPage extends StatelessWidget {
                   borderRadius: BorderRadius.circular(AppRadius.sm),
                 ),
                 child: Text(
-                  'PERSONA',
+                  AppCopy.resultPersona,
                   style: GoogleFonts.inter(
                     fontSize: 10,
                     fontWeight: FontWeight.w700,
@@ -416,22 +456,9 @@ class _ReceiptPage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 14),
-
-              // ── 페르소나 행
-              _ReceiptRow(
-                label: '동물',
-                value: '${animal.emoji}  ${animal.name}',
-              ),
-              _ReceiptRow(
-                label: '본능',
-                value: animal.archetype,
-              ),
-              _ReceiptRow(
-                label: '발급일',
-                value: dateStr,
-              ),
-
-              // ── 점선 박스 (스무고개 결과)
+              _ReceiptRow(label: '동물', value: animal.name),
+              _ReceiptRow(label: '본능', value: animal.archetype),
+              _ReceiptRow(label: '발급일', value: dateStr),
               const SizedBox(height: 14),
               _DashedBox(
                 child: Text(
@@ -444,15 +471,11 @@ class _ReceiptPage extends StatelessWidget {
                   ),
                 ),
               ),
-
-              // ── 구분선
               const SizedBox(height: 18),
               _Divider(),
               const SizedBox(height: 14),
-
-              // ── PORTFOLIO 라벨
               Text(
-                'RECOMMENDED PORTFOLIO',
+                AppCopy.resultRecommended,
                 style: GoogleFonts.inter(
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
@@ -461,16 +484,21 @@ class _ReceiptPage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
-
-              // ── 종목 리스트 (영수증 형식)
               ...rec.picks.take(6).map((pick) {
                 final stock = pick.stock;
+                final palette = AppColors.paletteFor(stock.sector.name);
                 return Padding(
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   child: Row(
                     children: [
-                      Text(stock.sector.emoji,
-                          style: const TextStyle(fontSize: 14)),
+                      Container(
+                        width: 4,
+                        height: 14,
+                        decoration: BoxDecoration(
+                          color: palette.bg,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -498,25 +526,20 @@ class _ReceiptPage extends StatelessWidget {
               }),
               if (rec.picks.length > 6)
                 Padding(
-                  padding: const EdgeInsets.only(top: 6, left: 22),
+                  padding: const EdgeInsets.only(top: 6, left: 16),
                   child: Text(
                     '외 ${rec.picks.length - 6}개 종목',
                     style: GoogleFonts.inter(
                       fontSize: 11,
                       color: AppColors.textTertiary,
-                      fontStyle: FontStyle.italic,
                     ),
                   ),
                 ),
-
-              // ── 구분선
               const SizedBox(height: 18),
               _Divider(),
               const SizedBox(height: 14),
-
-              // ── 합계 영역
               Text(
-                'SUMMARY',
+                AppCopy.resultSummary,
                 style: GoogleFonts.inter(
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
@@ -525,21 +548,23 @@ class _ReceiptPage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
-
-              _ReceiptRow(label: '월 배당 목표', value: '₩${_fmt(persona.monthlyTarget)}'),
-              _ReceiptRow(label: '필요 투자금', value: '₩${_fmt(rec.totalInvestment)}'),
-              _ReceiptRow(label: '커버리지', value: '${rec.coverageCount} / 12개월'),
-
+              _ReceiptRow(
+                  label: '월 배당 목표',
+                  value: '₩${_fmt(persona.monthlyTarget)}'),
+              _ReceiptRow(
+                  label: '필요 투자금',
+                  value: '₩${_fmt(rec.totalInvestment)}'),
+              _ReceiptRow(
+                  label: '커버리지',
+                  value: '${rec.coverageCount} / 12개월'),
               const SizedBox(height: 12),
               _Divider(),
               const SizedBox(height: 14),
-
-              // ── 거대한 합계 (Image 1의 Total Value)
               Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   Text(
-                    'MONTHLY',
+                    AppCopy.resultMonthly,
                     style: GoogleFonts.inter(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
@@ -565,10 +590,12 @@ class _ReceiptPage extends StatelessWidget {
                 children: [
                   const Spacer(),
                   Text(
-                    '목표 달성 $pct%',
+                    '$pct${AppCopy.resultGoalSuffix}',
                     style: GoogleFonts.inter(
                       fontSize: 11,
-                      color: pct >= 100 ? AppColors.gold : AppColors.textTertiary,
+                      color: pct >= 100
+                          ? AppColors.gold
+                          : AppColors.textTertiary,
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -577,12 +604,10 @@ class _ReceiptPage extends StatelessWidget {
             ],
           ),
         ),
-
-        // ── 영수증 하단 italic 카피
         const SizedBox(height: 16),
         Center(
           child: Text(
-            '· 발급된 영수증은 언제든 다시 확인할 수 있어요 ·',
+            '· ${AppCopy.resultReceiptHint} ·',
             style: GoogleFonts.playfairDisplay(
               fontSize: 11,
               fontStyle: FontStyle.italic,
@@ -606,13 +631,9 @@ class _ReceiptPage extends StatelessWidget {
   }
 }
 
-// ═════════════════════════════════════════════
-//  영수증 row
-// ═════════════════════════════════════════════
 class _ReceiptRow extends StatelessWidget {
   final String label;
   final String value;
-
   const _ReceiptRow({required this.label, required this.value});
 
   @override
@@ -645,9 +666,6 @@ class _ReceiptRow extends StatelessWidget {
   }
 }
 
-// ═════════════════════════════════════════════
-//  점선 박스 (Image 1의 위치 박스 영감)
-// ═════════════════════════════════════════════
 class _DashedBox extends StatelessWidget {
   final Widget child;
   const _DashedBox({required this.child});
@@ -672,19 +690,17 @@ class _DashedBorderPainter extends CustomPainter {
       Rect.fromLTWH(0, 0, size.width, size.height),
       const Radius.circular(radius),
     );
-
     final paint = Paint()
       ..color = AppColors.borderStrong
       ..strokeWidth = 1
       ..style = PaintingStyle.stroke;
-
-    // 점선 효과 (수동)
     final path = Path()..addRRect(rect);
     final dashed = _dashedPath(path, dashLength: 4, gapLength: 4);
     canvas.drawPath(dashed, paint);
   }
 
-  Path _dashedPath(Path source, {required double dashLength, required double gapLength}) {
+  Path _dashedPath(Path source,
+      {required double dashLength, required double gapLength}) {
     final result = Path();
     for (final metric in source.computeMetrics()) {
       double dist = 0;
@@ -701,35 +717,28 @@ class _DashedBorderPainter extends CustomPainter {
   bool shouldRepaint(_) => false;
 }
 
-// ═════════════════════════════════════════════
-//  영수증 구분선
-// ═════════════════════════════════════════════
 class _Divider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
       height: 1,
-      decoration: const BoxDecoration(
-        color: AppColors.borderSoft,
-      ),
+      decoration: const BoxDecoration(color: AppColors.borderSoft),
     );
   }
 }
 
-// ═════════════════════════════════════════════
-//  하단 CTA 버튼
-// ═════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
+//  Bottom CTA
+// ═══════════════════════════════════════════════════════════
 class _BottomCta extends StatelessWidget {
   final int page;
   final PersonaAnimal animal;
   final VoidCallback onNext;
-  final VoidCallback onRetake;
 
   const _BottomCta({
     required this.page,
     required this.animal,
     required this.onNext,
-    required this.onRetake,
   });
 
   @override
@@ -743,20 +752,20 @@ class _BottomCta extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           color: bg,
-          borderRadius: BorderRadius.circular(AppRadius.md),
+          borderRadius: BorderRadius.circular(AppRadius.full),
         ),
         child: Material(
           color: Colors.transparent,
           child: InkWell(
             onTap: onNext,
-            borderRadius: BorderRadius.circular(AppRadius.md),
+            borderRadius: BorderRadius.circular(AppRadius.full),
             child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 16),
+              padding: const EdgeInsets.symmetric(vertical: 14),
               child: Row(
                 children: [
-                  const SizedBox(width: 20),
+                  const SizedBox(width: 24),
                   Text(
-                    isFirst ? '내 영수증 보기' : '포트폴리오로 이동',
+                    isFirst ? AppCopy.resultCtaToReceipt : AppCopy.resultCtaToHome,
                     style: GoogleFonts.inter(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
@@ -766,21 +775,23 @@ class _BottomCta extends StatelessWidget {
                   ),
                   const Spacer(),
                   Container(
-                    width: 38,
-                    height: 38,
+                    width: 36,
+                    height: 36,
                     decoration: BoxDecoration(
-                      color: isFirst
-                          ? animal.signatureBg
-                          : AppColors.wineDeep,
-                      borderRadius: BorderRadius.circular(AppRadius.sm),
+                      color: fg.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(AppRadius.full),
+                      border: Border.all(
+                        color: fg.withValues(alpha: 0.3),
+                        width: 1,
+                      ),
                     ),
                     child: Icon(
                       Icons.arrow_forward_rounded,
-                      size: 18,
-                      color: isFirst ? animal.signatureText : AppColors.surface,
+                      size: 16,
+                      color: fg,
                     ),
                   ),
-                  const SizedBox(width: 4),
+                  const SizedBox(width: 6),
                 ],
               ),
             ),
