@@ -1,13 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
-/// ═══════════════════════════════════════════════════════════
-///  AnimalIllustration — Image 3 영감 (흑백 라인 동물)
-///
-///  ▸ 단색 잉크로 그리는 시그니처 동물 일러스트
-///  ▸ 디테일 풍부한 hatching/stripes로 빈티지 도감 분위기
-///  ▸ 8마리 모두 CustomPainter로 그림 (외부 SVG 의존 X)
-/// ═══════════════════════════════════════════════════════════
 
 class AnimalIllustration extends StatelessWidget {
   final String illustrationId;
